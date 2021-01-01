@@ -1,0 +1,18 @@
+#sinclothessizing .front_table {
+  font-size: small;
+}
+
+
+#sinclothessizing .front_table td {
+  text-align: center;
+  padding: 5px;
+}
+
+#sinclothessizing .sizes_bold {
+  font-weight: bold;
+}
+
+#sinclothessizing .sizes_left {
+    text-align: left;
+}
+
