@@ -3,16 +3,20 @@ if (!defined('_PS_VERSION_')) {
     exit;
 }
 
+require_once(dirname(__FILE__) . '/classes/SinClothesSizesHelper.php');
+
 class SinClothesSizing extends Module
 {
+    private $attributesGroups;
+
     public function __construct()
     {
         $this->name = 'sinclothessizing';
         $this->tab = 'front_office_features';
-        $this->version = '1.0.6';
+        $this->version = '1.0.5';
         $this->author = 'sinfonie';
         $this->need_instance = 0;
-        $this->ps_versions_compliancy = array('min' => '1.6', 'max' => '1.6.1.24');
+        $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
         $this->bootstrap = true;
 
         parent::__construct();
@@ -28,9 +32,8 @@ class SinClothesSizing extends Module
         $this->realSizes = $this->realSizes();
         $this->getSizes = $this->getSizes();
 
-        if (!Configuration::get('CLOTHES_SIZING_NAME')) {
-            $this->warning = $this->l('No name provided');
-        }
+
+
         require_once dirname(__FILE__) . '/classes/SizeObject.php';
     }
 
@@ -60,6 +63,136 @@ class SinClothesSizing extends Module
     {
         return parent::uninstall();
     }
+
+    public function getContent()
+    {
+        $this->attributesGroups = SinClothesSizesHelper::getGroupsAttributes($this->context->language->id);
+        $output = null;
+        if (Tools::isSubmit($this->name . '_submit')) {
+            $output = array_map([$this, 'onSubmit'], $this->attributesGroups);
+        }
+        return implode($output) . $this->displayForm();
+    }
+
+    private function onSubmit($group)
+    {
+        $valueName = $this->name . '_' . $group['id'];
+        $value = strval(Tools::getValue($valueName));
+        if (!Validate::isGenericName($value)) {
+            $output .= $this->displayError($this->l('Invalid Configuration value') . ': ' . $group['name']);
+        } else {
+            Configuration::updateValue($valueName, $value);
+            $output .= $this->displayConfirmation($this->l('Settings updated') . ': ' . $group['name']);
+        }
+        return $output;
+    }
+
+    private function moduleForm()
+    {
+        $fields_form[0]['form'] = array(
+            'legend' => array(
+                'title' => $this->l('Select attribute groups for size table use'),
+                'icon' => 'icon-cogs'
+            ),
+            'input' => array_merge(
+                $this->moduleFormSwitches(),
+                array(array('type' => 'free', 'name' => 'attribute_use_description', 'col' => 3, 'offset' => 0))
+            ),
+            'submit' => array(
+                'title' => $this->l('Save'),
+                'class' => 'btn btn-default pull-right'
+            )
+        );
+        return $fields_form;
+    }
+
+    private function moduleFormSwitches()
+    {
+        foreach ($this->attributesGroups as $group) {
+            $arr[] = [
+                'type' => 'switch',
+                'label' => $this->l($group['name']),
+                'name' => $this->name . '_' . $group['id'],
+                'is_bool' => true,
+                'desc' =>  $this->l('Attribute sizes') . ': ' . implode(', ', SinClothesSizesHelper::getAttributes($this->context->language->id, $group['id'])),
+                'values' => array(
+                    array(
+                        'id' => 'active_on',
+                        'value' => 1,
+                        'label' => $this->l('Enabled')
+                    ),
+                    array(
+                        'id' => 'active_off',
+                        'value' => 0,
+                        'label' => $this->l('Disabled')
+                    )
+                ),
+            ];
+        };
+        return $arr;
+    }
+
+    public function displayForm()
+    {
+
+        // Get default language
+        $default_lang = (int)Configuration::get('PS_LANG_DEFAULT');
+
+        // Init Fields form array
+        $fields_form = $this->moduleForm();
+
+
+        $helper = new HelperForm();
+
+        // Module, token and currentIndex
+        $helper->module = $this;
+        $helper->name_controller = $this->name;
+        $helper->token = Tools::getAdminTokenLite('AdminModules');
+        $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
+
+        // Language
+        $helper->default_form_language = $default_lang;
+        $helper->allow_employee_form_lang = $default_lang;
+
+        // Title and toolbar
+        $helper->title = $this->displayName;
+        $helper->show_toolbar = true;        // false -> remove toolbar
+        $helper->toolbar_scroll = true;      // yes - > Toolbar is always visible on the top of the screen.
+        $helper->submit_action = $this->name . '_submit';
+        $helper->toolbar_btn = array(
+            'save' =>
+            array(
+                'desc' => $this->l('Save'),
+                'href' => AdminController::$currentIndex . '&configure=' . $this->name . '&save' . $this->name .
+                    '&token=' . Tools::getAdminTokenLite('AdminModules'),
+            ),
+            'back' => array(
+                'href' => AdminController::$currentIndex . '&token=' . Tools::getAdminTokenLite('AdminModules'),
+                'desc' => $this->l('Back to list')
+            )
+        );
+        $helper->tpl_vars = ['fields_value' => $this->getAttributesDescription()];
+        // Load current value
+        foreach ($this->attributesGroups as $group) {
+            $helper->fields_value[$this->name . '_' . $group['id']] = Configuration::get($this->name . '_' . $group['id']);
+        }
+        echo '<pre>';
+        var_dump($fields_form);
+        return $helper->generateForm($fields_form);
+    }
+
+    private function getAttributesDescription()
+    {
+        $desc = '<div class="alert alert-info">
+                   <ul>
+                     <li>' . $this->l('Powyższe grupy atrybutów mogą zostać użyte do wygenerowania tabeli rozmiarów.') . '</li>
+                     <li>' . $this->l('Zwróć uwagę na to czy poszczególne rozmiary są ułożone od najmniejszego do największego.') . '</li>
+                     <li>' . $this->l('Ustawienie kolejności atrybutów można zmieniać za pomocą mechanizmu pozycji atrybutów') . '</li>
+                    </ul>
+                </div>';
+        return array('attribute_use_description' => $desc);
+    }
+
 
     private function realSizes()
     {
@@ -123,11 +256,10 @@ class SinClothesSizing extends Module
 
         foreach ($this->arraySizes as $key => $value) {
             if (isset($this->realSizes[$this->rewrite[$value]])) {
-                $array['names'][$key] = ($this->realSizes[$this->rewrite[$value]] !== null) ? true : false ;
+                $array['names'][$key] = ($this->realSizes[$this->rewrite[$value]] !== null) ? true : false;
             } else {
                 $array['names'][$key] = false;
             }
-            
         }
         foreach ($this->dimentionsNames as $name) {
             ((($this->getSizes['s'][$name]) == null)      ||
