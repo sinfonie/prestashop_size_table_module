@@ -113,6 +113,7 @@ class SinClothesSizing extends Module
                 'type' => 'switch',
                 'label' => $this->l($group['name']),
                 'name' => $this->name . '_' . $group['id'],
+                'hint' => $this->l('Click "Yes" to set this attribute group for size table use'),
                 'is_bool' => true,
                 'desc' =>  $this->l('Attribute sizes') . ': ' . implode(', ', SinClothesSizesHelper::getAttributes($this->context->language->id, $group['id'])),
                 'values' => array(
@@ -171,13 +172,15 @@ class SinClothesSizing extends Module
                 'desc' => $this->l('Back to list')
             )
         );
-        $helper->tpl_vars = ['fields_value' => $this->getAttributesDescription()];
-        // Load current value
+        $fieldVals = array();
+
         foreach ($this->attributesGroups as $group) {
-            $helper->fields_value[$this->name . '_' . $group['id']] = Configuration::get($this->name . '_' . $group['id']);
+            $fieldVals[$this->name . '_' . $group['id']] = Configuration::get($this->name . '_' . $group['id']);
         }
-        echo '<pre>';
-        var_dump($fields_form);
+        $helper->tpl_vars = ['fields_value' => array_merge(
+            $this->getAttributesDescription(),
+            $fieldVals
+        )];
         return $helper->generateForm($fields_form);
     }
 
