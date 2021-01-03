@@ -4,7 +4,7 @@ if (!defined('_PS_VERSION_')) {
   exit;
 }
 
-class SinClothesSizesHelper
+class ScsHelper
 {
 
   public static function getAttributes($lang, $id_group): array
@@ -17,18 +17,13 @@ class SinClothesSizesHelper
     return $output;
   }
 
-  public static function getGroupsAttributes($lang)
+  public static function getGroupsAttributes($lang = 'en'): array
   {
     $attributeGroups = AttributeGroup::getAttributesGroups($lang);
     $filteredGroups = array_filter($attributeGroups, function ($att) {
       if ($att['is_color_group'] === '0') return true;
     });
-    return array_map(function ($att) {
-      return [
-        'name' => $att['name'],
-        'id' => $att['id_attribute_group'],
-      ];
-    }, $filteredGroups);
+    return $filteredGroups;
   }
 
 

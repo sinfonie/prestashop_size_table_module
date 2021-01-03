@@ -3,12 +3,13 @@ if (!defined('_PS_VERSION_')) {
     exit;
 }
 
-require_once(dirname(__FILE__) . '/classes/SinClothesSizesHelper.php');
+require_once(dirname(__FILE__) . '/classes/ScsHelper.php');
+require_once(dirname(__FILE__) . '/classes/ScsForm.php');
 
 class SinClothesSizing extends Module
 {
-    private $attributesGroups;
-    private $mod_prefix = 'SCS_';
+    public $attributesGroups;
+    public $modPrefix = 'scs_';
 
     public function __construct()
     {
@@ -67,31 +68,13 @@ class SinClothesSizing extends Module
 
     public function getContent()
     {
-        $this->attributesGroups = SinClothesSizesHelper::getGroupsAttributes($this->context->language->id);
+        ScsForm::init($this);
+        $this->attributesGroups = ScsHelper::getGroupsAttributes($this->context->language->id);
         $output = null;
         if (Tools::isSubmit($this->name . '_submit')) {
-            $output = array_map([$this, 'onSubmit'], $this->attributesGroups);
+            $output = array_map('ScsForm::onSubmit', $this->attributesGroups);
         }
         return implode($output) . $this->displayForm();
-    }
-
-    private function onSubmit($group): string
-    {
-        $prefix = $this->mod_prefix . 'group_' . $group['id'];
-        $names = [$prefix . '_active', $prefix . '_first_size', $prefix . '_second_size'];
-        $output = '';
-        foreach ($names as $name) {
-            if (Tools::getValue($name)) {
-                $value = strval(Tools::getValue($name));
-                if (!Validate::isGenericName($value)) {
-                    $output .= $this->displayError($this->l('Invalid Configuration value') . ': ' . $name);
-                } else {
-                    Configuration::updateValue($name, $value);
-                    $output .= $this->displayConfirmation($this->l('Settings updated') . ': ' . $name);
-                }
-            }
-        }
-        return $output;
     }
 
     private function displayForm(): string
@@ -113,21 +96,30 @@ class SinClothesSizing extends Module
         $helper->submit_action = $this->name . '_submit';
         $attributeValues = array();
         $attributeGroups = array();
+        //tu się loaduje values
         foreach ($this->attributesGroups as $group) {
-            $fieldName = $this->mod_prefix . 'group_' . $group['id'] . '_active';
-            $value = Configuration::get($fieldName);
+            $fieldName = $this->modPrefix . 'group_' . $group['id_attribute_group'] . '_active';
+            $value = Configuration::get(strtoupper($fieldName));
             $attributeValues[$fieldName] = $value;
-            $attributeGroups[$group['id']] = $value;
+            $attributeGroups[$group['id_attribute_group']] = $value;
+        }
+
+        $fields_form[] = $this->attributesForm();
+        $filteredAttributeGroups = array_filter($attributeGroups);
+        if (!empty($filteredAttributeGroups)) {
+            $fields_form[] = $this->basisDimensionsForm($filteredAttributeGroups);
+
+            foreach (array_keys($filteredAttributeGroups) as $key) {
+                $first = $this->modPrefix . 'group_' . $key . '_first_size';
+                $second = $this->modPrefix . 'group_' . $key . '_second_size';
+                $attributeValues[$first] = Configuration::get(strtoupper($first));
+                $attributeValues[$second] = Configuration::get(strtoupper($second));
+            }
         }
         $helper->tpl_vars = ['fields_value' => array_merge(
             $this->getAttributesDescription(),
             $attributeValues
         )];
-        $fields_form[] = $this->attributesForm();
-        $filteredAttributeGroups = array_filter($attributeGroups);
-        if (!empty($filteredAttributeGroups)) {
-            $fields_form[] = $this->basisDimensionsForm($filteredAttributeGroups);
-        }
         return $helper->generateForm($fields_form);
     }
 
@@ -173,10 +165,10 @@ class SinClothesSizing extends Module
             $arr[] = [
                 'type' => 'switch',
                 'label' => $this->l($group['name']),
-                'name' => $this->mod_prefix . 'group_' . $group['id'] . '_active',
+                'name' => $this->modPrefix . 'group_' . $group['id_attribute_group'] . '_active',
                 'hint' => $this->l('Click "Yes" to set this attribute group for size table use'),
                 'is_bool' => true,
-                'desc' =>  $this->l('Attribute sizes') . ': ' . implode(', ', SinClothesSizesHelper::getAttributes($this->context->language->id, $group['id'])),
+                'desc' =>  $this->l('Attribute sizes') . ': ' . implode(', ', ScsHelper::getAttributes($this->context->language->id, $group['id'])),
                 'values' => array(
                     array(
                         'id' => 'active_on',
@@ -199,7 +191,7 @@ class SinClothesSizing extends Module
     {
         $selectors = ['first', 'second'];
         foreach (array_keys($attributeGroups) as $attributeGroupId) {
-            $attributes = SinClothesSizesHelper::getAttributes($this->context->language->id, $attributeGroupId);
+            $attributes = ScsHelper::getAttributes($this->context->language->id, $attributeGroupId);
             $middle = (int)floor(count($attributes) / 2);
             $sliced['first'] = array_slice($attributes, 0, $middle, true);
             $sliced['second'] = array_slice($attributes, $middle, null, true);
@@ -207,14 +199,12 @@ class SinClothesSizing extends Module
                 $arr[] = [
                     'type' => 'select',
                     'label' => $this->l(ucfirst($select) . ' basic dimension'),
-                    'name' => $this->mod_prefix . 'group_' . $attributeGroupId . '_' . $select . '_size',
+                    'name' => $this->modPrefix . 'group_' . $attributeGroupId . '_' . $select . '_size',
                     'desc' =>  $this->l('Choose ' . $select . ' basic dimension for group:') . $attributeGroupId,
-                    
                     'options' => [
                         'query' => $this->getGroupAttributesOptions($sliced[$select]),
                         'id' => 'id_option',
-                        'name' => 'name',
-                        
+                        'name' => 'name'
                     ],
                 ];
             }
@@ -228,7 +218,6 @@ class SinClothesSizing extends Module
             $arr[] = [
                 'id_option' => $key,
                 'name' => $value,
-
             ];
         }
         return  $arr;
