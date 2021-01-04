@@ -31,6 +31,8 @@ class SinClothesSizing extends Module
         $this->dimentionsNames = array('bust', 'waist', 'hips', 'length');
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall?');
 
+        $this->contextLangId = $this->context->language->id;
+
         $this->realSizes = $this->realSizes();
         $this->getSizes = $this->getSizes();
 
@@ -70,10 +72,8 @@ class SinClothesSizing extends Module
     {
         ScsForm::init($this);
         $this->attributesGroups = ScsHelper::getGroupsAttributes($this->context->language->id);
-        $output = null;
-        if (Tools::isSubmit($this->name . '_submit')) {
-            $output = array_map('ScsForm::onSubmit', $this->attributesGroups);
-        }
+        $this->groupsConfValues = ScsForm::getConfValues($this->attributesGroups);
+        $output = ScsForm::submitForm($this->groupsConfValues);
         return implode($output) . $this->displayForm();
     }
 
@@ -94,147 +94,12 @@ class SinClothesSizing extends Module
         $helper->show_toolbar = true;        // false -> remove toolbar
         $helper->toolbar_scroll = true;      // yes - > Toolbar is always visible on the top of the screen.
         $helper->submit_action = $this->name . '_submit';
-        $attributeValues = array();
-        $attributeGroups = array();
-        //tu się loaduje values
-        foreach ($this->attributesGroups as $group) {
-            $fieldName = $this->modPrefix . 'group_' . $group['id_attribute_group'] . '_active';
-            $value = Configuration::get(strtoupper($fieldName));
-            $attributeValues[$fieldName] = $value;
-            $attributeGroups[$group['id_attribute_group']] = $value;
-        }
 
-        $fields_form[] = $this->attributesForm();
-        $filteredAttributeGroups = array_filter($attributeGroups);
-        if (!empty($filteredAttributeGroups)) {
-            $fields_form[] = $this->basisDimensionsForm($filteredAttributeGroups);
+        $form = ScsForm::getFormData($this->attributesGroups, $this->groupsConfValues);
 
-            foreach (array_keys($filteredAttributeGroups) as $key) {
-                $first = $this->modPrefix . 'group_' . $key . '_first_size';
-                $second = $this->modPrefix . 'group_' . $key . '_second_size';
-                $attributeValues[$first] = Configuration::get(strtoupper($first));
-                $attributeValues[$second] = Configuration::get(strtoupper($second));
-            }
-        }
-        $helper->tpl_vars = ['fields_value' => array_merge(
-            $this->getAttributesDescription(),
-            $attributeValues
-        )];
-        return $helper->generateForm($fields_form);
+        $helper->tpl_vars = ['fields_value' => $form['values']];
+        return $helper->generateForm($form['fields']);
     }
-
-    private function basisDimensionsForm($attributeValues): array
-    {
-        $fields_form['form'] = array(
-            'legend' => array(
-                'title' => $this->l('Choose basis of dimensions'),
-                'icon' => 'icon-cogs'
-            ),
-            'input' => $this->basisDimensionsSwitches($attributeValues),
-            'submit' => array(
-                'title' => $this->l('Save'),
-                'class' => 'btn btn-default pull-right'
-            )
-        );
-        return $fields_form;
-    }
-
-    private function attributesForm(): array
-    {
-        $fields_form['form'] = array(
-            'legend' => array(
-                'title' => $this->l('Select attribute groups for size table use'),
-                'icon' => 'icon-cogs'
-            ),
-            'input' => array_merge(
-                array(array('type' => 'free', 'name' => 'attribute_use_description', 'col' => 3, 'offset' => 0),),
-                $this->attributesFormSwitches()
-            ),
-            'submit' => array(
-                'title' => $this->l('Save'),
-                'class' => 'btn btn-default pull-right'
-            )
-        );
-        return $fields_form;
-    }
-
-    private function attributesFormSwitches(): array
-    {
-        $arr = array();
-        foreach ($this->attributesGroups as $group) {
-            $arr[] = [
-                'type' => 'switch',
-                'label' => $this->l($group['name']),
-                'name' => $this->modPrefix . 'group_' . $group['id_attribute_group'] . '_active',
-                'hint' => $this->l('Click "Yes" to set this attribute group for size table use'),
-                'is_bool' => true,
-                'desc' =>  $this->l('Attribute sizes') . ': ' . implode(', ', ScsHelper::getAttributes($this->context->language->id, $group['id'])),
-                'values' => array(
-                    array(
-                        'id' => 'active_on',
-                        'value' => 1,
-                        'label' => $this->l('Enabled')
-                    ),
-                    array(
-                        'id' => 'active_off',
-                        'value' => 0,
-                        'label' => $this->l('Disabled')
-                    )
-                ),
-            ];
-        };
-        return $arr;
-    }
-
-
-    private function basisDimensionsSwitches($attributeGroups): array
-    {
-        $selectors = ['first', 'second'];
-        foreach (array_keys($attributeGroups) as $attributeGroupId) {
-            $attributes = ScsHelper::getAttributes($this->context->language->id, $attributeGroupId);
-            $middle = (int)floor(count($attributes) / 2);
-            $sliced['first'] = array_slice($attributes, 0, $middle, true);
-            $sliced['second'] = array_slice($attributes, $middle, null, true);
-            foreach ($selectors as $select) {
-                $arr[] = [
-                    'type' => 'select',
-                    'label' => $this->l(ucfirst($select) . ' basic dimension'),
-                    'name' => $this->modPrefix . 'group_' . $attributeGroupId . '_' . $select . '_size',
-                    'desc' =>  $this->l('Choose ' . $select . ' basic dimension for group:') . $attributeGroupId,
-                    'options' => [
-                        'query' => $this->getGroupAttributesOptions($sliced[$select]),
-                        'id' => 'id_option',
-                        'name' => 'name'
-                    ],
-                ];
-            }
-        };
-        return $arr;
-    }
-
-    private function getGroupAttributesOptions($attributes)
-    {
-        foreach ($attributes as $key => $value) {
-            $arr[] = [
-                'id_option' => $key,
-                'name' => $value,
-            ];
-        }
-        return  $arr;
-    }
-
-    private function getAttributesDescription(): array
-    {
-        $desc = '<div class="alert alert-info">
-                   <ul>
-                     <li>' . $this->l('Poniższe grupy atrybutów mogą zostać użyte do wygenerowania tabeli rozmiarów.') . '</li>
-                     <li>' . $this->l('Zwróć uwagę na to czy poszczególne rozmiary są ułożone od najmniejszego do największego.') . '</li>
-                     <li>' . $this->l('Ustawienie kolejności atrybutów można zmieniać za pomocą mechanizmu pozycji atrybutów') . '</li>
-                 </ul>
-                 </div>';
-        return array('attribute_use_description' => $desc);
-    }
-
 
     private function realSizes()
     {
