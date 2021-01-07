@@ -1,13 +1,23 @@
 <?php
 
+/**
+ * ScsHelper
+ * @author Maciej Rumiński <ruminski.maciej@gmail.com>
+ */
+
 if (!defined('_PS_VERSION_')) {
   exit;
 }
 
 class ScsHelper
 {
-
-  public static function getAttributes($lang, $id_group): array
+  /**
+   * Method returns re-mapped attribute group where keys are  `id_attribute` and values are `name` 
+   * @param array $lang
+   * @param array $id_group
+   * @return array
+   */
+  public static function getAttributes($id_group, $lang = 'en'): array
   {
     $attributes = array_map('self::mapAttributes', AttributeGroup::getAttributes($lang, $id_group));
     $output = [];
@@ -17,6 +27,11 @@ class ScsHelper
     return $output;
   }
 
+  /**
+   * Method returns non color groups
+   * @param array $lang
+   * @return array
+   */
   public static function getGroupsAttributes($lang = 'en'): array
   {
     $attributeGroups = AttributeGroup::getAttributesGroups($lang);
@@ -26,7 +41,9 @@ class ScsHelper
     return $filteredGroups;
   }
 
-
+  /**
+   * Remap mathod
+   */
   private static function mapAttributes($att)
   {
     return  [$att['id_attribute'] => $att['name']];

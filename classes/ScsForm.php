@@ -1,5 +1,10 @@
 <?php
 
+/**
+ * ScsForm class is responsible for managing and creating a configuration form for the module
+ * @author Maciej Rumiński <ruminski.maciej@gmail.com>
+ */
+
 if (!defined('_PS_VERSION_')) {
   exit;
 }
@@ -25,7 +30,10 @@ class ScsForm
     'end',
   ];
 
-  public static function translateLabels($name)
+  /**
+   * Method sets translations for $confNames
+   */
+  private static function translateLabels($name)
   {
     switch ($name) {
       case 'is_active':
@@ -39,8 +47,6 @@ class ScsForm
         break;
     }
   }
-
-
 
   /**
    * Method returns all attribute values ready to use in prestashop forms
@@ -78,8 +84,6 @@ class ScsForm
     }, self::$confNames, array_fill_keys(self::$confNames, $group));
   }
 
-
-
   /**
    * Method checks for submit and call onSubmit method for each given attribute group
    * @param array $confValues array of arrays in "confValueFormat"
@@ -92,6 +96,41 @@ class ScsForm
       $output = array_map('self::onSubmit', $confValues);
     }
     return $output;
+  }
+
+  /**
+   * Method return array with with 'fields' and 'values' keys
+   * @param array $attributesGroups
+   * @param array $confValues
+   * @return array
+   */
+  public static function getFormData($attributesGroups, $confValues): array
+  {
+    $activeAttributes =  self::getActiveAttributes($attributesGroups, $confValues);
+    $form = [];
+    $elements = [];
+    foreach ($confValues as $groupId => $groupConfValues) {
+      $form['values'][$groupConfValues['is_active']['field_lower']] = Configuration::get($groupConfValues['is_active']['field_upper']);
+      $elements['group_radio'][] = self::elementGroupRadio($groupConfValues['is_active']);
+      if (in_array($groupId, $activeAttributes)) {
+        $sliced = self::getSlicedAtrributesArray($groupId);
+        foreach ($groupConfValues as $confValue) {
+          if ($confValue['field_name'] !== 'is_active') {
+            $form['values'][$confValue['field_lower']] = Configuration::get($confValue['field_upper']);
+            $elements['dimension_select'][] = self::elementDimensionSelect($confValue, $sliced);
+          }
+        }
+      }
+    }
+    $form['values'] = array_merge($form['values'], self::getAttributesDescription());
+
+    if (!empty($form)) {
+      $form['fields'][] = self::groupsForm($elements['group_radio']);
+      $form['fields'][] = self::dimensionsForm($elements['dimension_select']);
+    } else {
+      $form['fields'] = [];
+    }
+    return $form;
   }
 
   /**
@@ -120,43 +159,13 @@ class ScsForm
     return $output;
   }
 
-  //wada podwójna odpowiedzialność, odpowiada za elementy i wartości
-  public static function getFormData($attributesGroups, $confValues): array
-  {
-    $form = [];
-    $elements = [];
-    $activeAttributes =  self::getActiveAttributes($attributesGroups, $confValues);
-    foreach ($confValues as $groupId => $groupConfValues) {
-      $form['values'][$groupConfValues['is_active']['field_lower']] = Configuration::get($groupConfValues['is_active']['field_upper']);
-      $elements['group_radio'][] = self::elementGroupRadio($groupConfValues['is_active']);
-      if (in_array($groupId, $activeAttributes)) {
-        $sliced = self::getSlicedAtrributesArray($groupId);
-        foreach ($groupConfValues as $confValue) {
-          if ($confValue['field_name'] !== 'is_active') {
-            $form['values'][$confValue['field_lower']] = Configuration::get($confValue['field_upper']);
-            $elements['dimension_select'][] = self::elementDimensionSelect($confValue, $sliced);
-          }
-        }
-      }
-    }
-    $form['values'] = array_merge($form['values'], self::getAttributesDescription());
-
-    if (!empty($form)) {
-      $form['fields'][] = self::groupsForm($elements['group_radio']);
-      $form['fields'][] = self::dimensionsForm($elements['dimension_select']);
-    } else {
-      $form['fields'] = [];
-    }
-    return $form;
-  }
-
   /**
    * Method returns an array with active attributes ids
    * @param array $attributesGroups
    * @param array $confValues array of arrays in "confValueFormat"
    * @return array
    */
-  public static function getActiveAttributes($attributesGroups, $confValues)
+  private static function getActiveAttributes($attributesGroups, $confValues)
   {
     foreach ($attributesGroups as $group) {
       $attributes[$group['id_attribute_group']] = Configuration::get($confValues[$group['id_attribute_group']]['is_active']['field_upper']);
@@ -172,7 +181,7 @@ class ScsForm
    */
   private static function getSlicedAtrributesArray($groupId): array
   {
-    $attributes = ScsHelper::getAttributes(self::$module->contextLangId, $groupId);
+    $attributes = ScsHelper::getAttributes($groupId, self::$module->contextLangId);
     $middle = (int)floor(count($attributes) / 2);
     $sliced['start'] = array_slice($attributes, 0, $middle, true);
     $sliced['end'] = array_slice($attributes, $middle, null, true);
@@ -222,7 +231,7 @@ class ScsForm
       'name' => $groupConfValue['field_lower'],
       'hint' => self::$module->l('Click "Yes" to set this attribute group for size table use'),
       'is_bool' => true,
-      'desc' =>  self::$module->l('Attribute sizes') . ': ' . implode(', ', ScsHelper::getAttributes(self::$module->contextLangId, $groupConfValue['group_id'])),
+      'desc' =>  self::$module->l('Attribute sizes') . ': ' . implode(', ', ScsHelper::getAttributes($groupConfValue['group_id'], self::$module->contextLangId)),
       'values' => array(
         array(
           'id' => 'active_on',
