@@ -38,7 +38,13 @@ class ScsHelper
     $filteredGroups = array_filter($attributeGroups, function ($att) {
       if ($att['is_color_group'] === '0') return true;
     });
-    return $filteredGroups;
+    $groups = [];
+    if (!empty($filteredGroups)) {
+      foreach ($filteredGroups as $group) {
+        $groups[$group['id_attribute_group']] = $group;
+      }
+    }
+    return $groups;
   }
 
   /**

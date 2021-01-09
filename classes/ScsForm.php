@@ -133,6 +133,19 @@ class ScsForm
     return $form;
   }
 
+  public static function noAttributes()
+  {
+    return self::$module->displayWarning(
+      self::$module->l('There are no attributes this module can use. Click below to create some.')
+        .
+        '<p>
+          <a class="btn btn-success" href="?controller=AdminAttributesGroups&addattribute_group&token=' . Tools::getAdminTokenLite('AdminAttributesGroups') . '">' .
+        self::$module->l('Create attributes') .
+        '</a>
+        </p>'
+    );
+  }
+
   /**
    * Method update values and return alert strings
    * @param array $confValues array of arrays in "confValueFormat"
@@ -241,6 +254,11 @@ class ScsForm
         array(
           'id' => 'active_off',
           'value' => 0,
+          'label' => self::$module->l('Disabled')
+        ),
+                array(
+          'id' => 'active_owff',
+          'value' => 2,
           'label' => self::$module->l('Disabled')
         )
       ),

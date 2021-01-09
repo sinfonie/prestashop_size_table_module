@@ -16,8 +16,21 @@ $sql[] = 'CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . 'sin_clothes_sizing` (
     PRIMARY KEY  (`id`)
 ) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8;';
 
+$sql[] = 'CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . 'scs_configurations` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+	`attr_group_id` int(11) NOT NULL,
+	`dim_start` int(11) NOT NULL,
+	`dim_end` int(11) NOT NULL,
+	`properties` VARCHAR(32765) NOT NULL,
+	`active` boolean NOT NULL,
+	`date_add` datetime DEFAULT CURRENT_TIMESTAMP,
+	`date_upd` datetime NULL ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY  (`id`)
+) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8;';
+
+
 foreach ($sql as $query) {
-    if (Db::getInstance()->execute($query) == false) {
-        return false;
-    }
+	if (Db::getInstance()->execute($query) == false) {
+		return false;
+	}
 }
