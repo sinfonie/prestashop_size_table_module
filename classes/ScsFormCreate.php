@@ -34,8 +34,6 @@ class ScsFormCreate
     var_dump(Tools::getValue('new_attr_group_id'));
   }
 
-
-
   public static function getFormFields($attributesGroups)
   {
     $form['form'] = [
@@ -120,7 +118,10 @@ class ScsFormCreate
             'name' => 'name',
           ],
         ],
-
+        [
+          'type'  => 'html',
+          'html_content' => '<input type="hidden" value="' . $formSettings['number_of_properties'] . '" id="no_properties" name="no_properties"">',
+        ]
       ],
     ];
     $submit = [
@@ -130,6 +131,7 @@ class ScsFormCreate
       ' . self::$module->l('Save new model') . '</button>'
       ]
     ];
+    var_dump($formSettings['number_of_properties']);
     $form['form']['input'] = array_merge($form['form']['input'], self::getTextFields($formSettings['number_of_properties']), $submit);
 
     return  $form;

@@ -90,7 +90,7 @@ class SinClothesSizing extends Module
                 $noProperties = ($noProperties <= 1) ? 1 : $noProperties;
                 $formSettings = [
                     'group_id' => Tools::getValue('new_attr_group_id'),
-                    'group_name' => $this->attributesGroups[Tools::getValue('new_attr_group_id')git]['name'],
+                    'group_name' => $this->attributesGroups[Tools::getValue('new_attr_group_id')]['name'],
                     'number_of_properties' => $noProperties,
                 ];
                 $result = ScsFormCreate::getAddForm($formSettings);
