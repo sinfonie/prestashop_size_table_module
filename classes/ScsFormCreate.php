@@ -1,7 +1,6 @@
 <?php
 
 /**
- * ScsForm class is responsible for managing and creating a configuration form for the module
  * @author Maciej Rumiński <ruminski.maciej@gmail.com>
  */
 
@@ -31,8 +30,38 @@ class ScsFormCreate
 
   public static function submitNewModel()
   {
-    var_dump(Tools::getValue('new_attr_group_id'));
+    $output = '';
+    if (Tools::isSubmit(self::$module->name . '_submit')) {
+      $newModel = new ScsConfiguration;
+     foreach (array_keys(ScsConfiguration::$definition['fields']) as $field) {
+       $newModel->$field = Tools::getValue($field);
+     }
+    }
+    $newModel->save();
+    echo '<pre>';
+    var_dump($_POST);
+    return $output;
   }
+
+
+  private static function onSubmit($field): string
+  {
+    $output = '';
+    
+    $getValue = 'asd' ;
+    if ($getValue !== false) {
+      $value = strval($getValue);
+      if (!Validate::isGenericName($value)) {
+        $output .= self::$module->displayError(self::$module->l('Update failure: ') . $field);
+      } else {
+
+        
+        $output .= self::$module->displayConfirmation(self::$module->l('Update succesful: ') . $field);
+      }
+    }
+    return $output;
+  }
+
 
   public static function getFormFields($attributesGroups)
   {
@@ -59,7 +88,7 @@ class ScsFormCreate
         ],
         [
           'type'  => 'html',
-          'html_content' => '<button type="submit" value="1" id="configuration_form_submit_btn" name="sinclothessizing_submit" class="btn btn-primary">
+          'html_content' => '<button type="submit" value="1" id="configuration_form_submit_btn" name="' . self::$module->name . '_submit" class="btn btn-primary">
 							' . self::$module->l('Add new model') . '
 						</button>'
         ],

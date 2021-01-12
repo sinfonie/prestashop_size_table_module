@@ -72,15 +72,15 @@ class SinClothesSizing extends Module
 
     public function getContent()
     {
+        ScsFormCreate::init($this);
+        $output = ScsFormCreate::submitNewModel();
 
-        return '<div class="scs__admin">' . $this->getForms() . '</div>';
+        return '<div class="scs__admin">' . $output . $this->getForms() . '</div>';
     }
 
     public function getForms()
     {
-
-        ScsFormCreate::init($this);
-
+        
         $this->attributesGroups = ScsHelper::getGroupsAttributes($this->context->language->id);
         //$this->groupsConfValues = ScsForm::getConfValues($this->attributesGroups);
 
@@ -96,9 +96,9 @@ class SinClothesSizing extends Module
                 $result = ScsFormCreate::getAddForm($formSettings);
                 return '<div class="col-lg-7">' . $this->displayAddForm($result) . '</div>';
             } else {
-                $output = ScsFormCreate::submitNewModel();
+                
                 $formValues = ScsFormCreate::getValues($this->attributesGroups);
-                return $output . $this->displayForm($formValues);
+                return $this->displayForm($formValues);
             }
         } else {
             return 'the is no attributes';
