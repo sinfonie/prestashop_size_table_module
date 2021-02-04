@@ -9,20 +9,22 @@ if (!defined('_PS_VERSION_')) {
   exit;
 }
 
-class ScsConfiguration extends ObjectModel
+class ScsDb extends ObjectModel
 {
 
   public $id;
   public $attr_group_id;
   public $dim_start;
   public $dim_end;
+  public $name;
   public $properties;
   public $active;
 
   public static $definition = array(
     'table' => 'scs_configurations',
     'primary' => 'id',
-    'multishop' => true,
+    'multilang' => true,
+    'multilang_shop' => true,
     'fields' => array(
       'attr_group_id' => array(
         'type' => self::TYPE_INT,
@@ -35,27 +37,41 @@ class ScsConfiguration extends ObjectModel
       'dim_end' => array(
         'type' => self::TYPE_INT,
         'validate' => 'isUnsignedInt',
-        'allow_null' => true,
+      ),
+      'name' => array(
+        'type' => self::TYPE_STRING,
+        'validate' => 'isString',
+        'size' => 64,
       ),
       'properties' => array(
         'type' => self::TYPE_STRING,
         'validate' => 'isString',
-        'allow_null' => true,
-        'size' => 128,
       ),
       'active' => array(
         'type' => self::TYPE_BOOL,
         'validate' => 'isBool',
-        'allow_null' => true,
-
       ),
     ),
   );
 
-  public static function getConfiguration($id)
+
+
+  public static function dbModels()
   {
-    $sql = 'SELECT `id`, `attr_group_id`, `dim_start`, `dim_end`, `properties`, `active` FROM `' . _DB_PREFIX_ . 'scs_configurations` ' .
+    $sql = 'SELECT `id`, `attr_group_id`, `dim_start`, `dim_end`, `name`, `properties`, `active` FROM `' . _DB_PREFIX_ . 'scs_configurations`';
+    return self::dbRequest($sql);
+  }
+
+
+  public static function dbModel($id)
+  {
+    $sql = 'SELECT `id`, `attr_group_id`, `dim_start`, `dim_end`, `name`, `properties`, `active` FROM `' . _DB_PREFIX_ . 'scs_configurations` ' .
       'WHERE `id` = ' . $id;
+    return self::dbRequest($sql);
+  }
+
+  private static function dbRequest($sql)
+  {
     $request = Db::getInstance()->executeS($sql);
     $array = [];
     if ($request === false) {
@@ -67,6 +83,7 @@ class ScsConfiguration extends ObjectModel
         $object->attr_group_id = $v['attr_group_id'];
         $object->dim_start = $v['dim_start'];
         $object->dim_end = $v['dim_end'];
+        $object->name = $v['name'];
         $object->properties = $v['properties'];
         $object->active = $v['active'];
         $array[] = $object;

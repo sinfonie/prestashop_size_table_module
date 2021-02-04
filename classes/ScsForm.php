@@ -1,7 +1,6 @@
 <?php
 
 /**
- * ScsForm class is responsible for managing and creating a configuration form for the module
  * @author Maciej Rumiński <ruminski.maciej@gmail.com>
  */
 
@@ -21,177 +20,181 @@ class ScsForm
     return self::$module;
   }
 
-  /**
-   * Names of values assigned to each attribute
-   */
-  private static $confNames = [
-    'is_active',
-    'start',
-    'end',
-  ];
-
-  /**
-   * Method sets translations for $confNames
-   */
-  private static function translateLabels($name)
+  public static function submitNewModel()
   {
-    switch ($name) {
-      case 'is_active':
-        return self::$module->l('is active');
-        break;
-      case 'start':
-        return self::$module->l('start');
-        break;
-      case 'end':
-        return self::$module->l('end');
-        break;
-    }
-  }
-
-  /**
-   * Method returns all attribute values ready to use in prestashop forms
-   * @param array $attributesGroups given attribute array
-   * @return array array
-   */
-  public static function getConfValues(array $attributesGroups): array
-  {
-    foreach ($attributesGroups as $group) {
-      $groupConfAttributes = self::createConfValues($group);
-      foreach ($groupConfAttributes as $confAttribute) {
-        $output[$group['id_attribute_group']][$confAttribute['field_name']] = $confAttribute;
+    $display = '';
+    if (Tools::isSubmit('create_new_model_submit')) {
+      $newModel = new ScsDb;
+      foreach (array_keys(ScsDb::$definition['fields']) as $field) {
+        if ($field == 'properties') continue;
+        $newModel->$field = Tools::getValue($field);
+      }
+      $newModel->properties = serialize(ScsHelper::getLangProperties());
+      $newModel->active = true;
+      if ($newModel->validateFields()) {
+        $newModel->save();
+        $display = self::$module->displayConfirmation(self::$module->l('New model created', 'ScsForm'));
+      } else {
+        $display = self::$module->displayError(self::$module->l('New model creation failed', 'ScsForm'));
       }
     }
-    return $output;
+    return $display;
   }
 
-  /**
-   * Method returns an set of values ready to use in prestashop forms
-   * @param array $group given attribute array
-   * @return array array in "confValueFormat" used in several method in this class
-   */
-  public static function createConfValues(array $group): array
+  public static function addModelForm($attributesGroups)
   {
-    return array_map(function ($name, $group) {
-      $field = self::$module->modPrefix . 'group_' . $group['id_attribute_group'] . '_' . $name;
-      return [
-        'field_lower' => $field,
-        'field_upper' => strtoupper($field),
-        'label' => self::translateLabels($name),
-        'group_id' => $group['id_attribute_group'],
-        'group_name' => $group['name'],
-        'field_name' => $name,
-      ];
-    }, self::$confNames, array_fill_keys(self::$confNames, $group));
-  }
-
-  /**
-   * Method checks for submit and call onSubmit method for each given attribute group
-   * @param array $confValues array of arrays in "confValueFormat"
-   * @return array array with all given groups alert strings
-   */
-  public static function submitForm(array $confValues): array
-  {
-    $output = [];
-    if (Tools::isSubmit(self::$module->name . '_submit')) {
-      $output = array_map('self::onSubmit', $confValues);
-    }
-    return $output;
-  }
-
-  /**
-   * Method return array with with 'fields' and 'values' keys
-   * @param array $attributesGroups
-   * @param array $confValues
-   * @return array
-   */
-  public static function getFormData($attributesGroups, $confValues): array
-  {
-    $activeAttributes =  self::getActiveAttributes($attributesGroups, $confValues);
     $form = [];
-    $elements = [];
-    foreach ($confValues as $groupId => $groupConfValues) {
-      $form['values'][$groupConfValues['is_active']['field_lower']] = Configuration::get($groupConfValues['is_active']['field_upper']);
-      $elements['group_radio'][] = self::elementGroupRadio($groupConfValues['is_active']);
-      if (in_array($groupId, $activeAttributes)) {
-        $sliced = self::getSlicedAtrributesArray($groupId);
-        foreach ($groupConfValues as $confValue) {
-          if ($confValue['field_name'] !== 'is_active') {
-            $form['values'][$confValue['field_lower']] = Configuration::get($confValue['field_upper']);
-            $elements['dimension_select'][] = self::elementDimensionSelect($confValue, $sliced);
-          }
-        }
-      }
-    }
-    $form['values'] = array_merge($form['values'], self::getAttributesDescription());
-
-    if (!empty($form)) {
-      $form['fields'][] = self::groupsForm($elements['group_radio']);
-      $form['fields'][] = self::dimensionsForm($elements['dimension_select']);
-    } else {
-      $form['fields'] = [];
-    }
+    $form['fields'][0] = self::addModelFields($attributesGroups);
+    $form['values']['attr_group_id'] = null;
     return $form;
   }
 
-  public static function noAttributes()
+  public static function createModelForm($attributesGroups)
   {
-    return self::$module->displayWarning(
-      self::$module->l('There are no attributes this module can use. Click below to create some.')
-        .
-        '<p>
-          <a class="btn btn-success" href="?controller=AdminAttributesGroups&addattribute_group&token=' . Tools::getAdminTokenLite('AdminAttributesGroups') . '">' .
-        self::$module->l('Create attributes') .
-        '</a>
-        </p>'
-    );
+    $noProperties = intval(Tools::getValue('no_properties'));
+    $noProperties = ($noProperties <= 1) ? 1 : $noProperties;
+    $formSettings = [
+      'attr_group_id' => Tools::getValue('attr_group_id'),
+      'group_name' => $attributesGroups[Tools::getValue('attr_group_id')]['name'],
+      'no_properties' => $noProperties,
+    ];
+    $form = [];
+    $form['fields'][0] = self::createModelFields($formSettings);
+    return $form;
   }
 
-  /**
-   * Method update values and return alert strings
-   * @param array $confValues array of arrays in "confValueFormat"
-   * @return array string with specific group alert strings
-   */
-  private static function onSubmit(array $confValues): string
+
+  private static function addModelFields($attributesGroups)
   {
-    $output = '';
-    foreach ($confValues as $confVal) {
-      $getValue = Tools::getValue($confVal['field_lower']);
-      if ($getValue !== false) {
-        $value = strval($getValue);
-        $text = ' -  ' . ucfirst($confVal['label']) . ' (' . $confVal['group_name'] . ')';
-        if (!Validate::isGenericName($value)) {
-          $output .= self::$module->displayError(self::$module->l('Update failure: ') . $text);
-        } else {
-          if ($value !== Configuration::get($confVal['field_upper'])) {
-            Configuration::updateValue($confVal['field_upper'], $value);
-            $output .= self::$module->displayConfirmation(self::$module->l('Update succesful: ') . $text);
-          }
-        }
-      }
+    $form['form'] = [
+      'legend' => [
+        'title' => self::$module->l('Select attribute groups for size table use', 'ScsForm'),
+        'icon' => 'icon-cogs'
+      ],
+      'input' => [
+        [
+          'type' => 'select',
+          'label' => self::$module->l('Select and add new model', 'ScsForm'),
+          'name' => 'attr_group_id',
+          'options' => [
+            'query' => self::groupSelect($attributesGroups),
+            'id' => 'id_option',
+            'name' => 'name',
+          ],
+        ],
+        [
+          'type'  => 'html',
+          'label' => self::$module->l('Set number of properties', 'ScsForm'),
+          'html_content' => '<input type="number" min="1" value="1" id="no_properties" name="no_properties">'
+        ],
+        [
+          'type'  => 'html',
+          'html_content' => '<button type="submit" value="1" id="configuration_form_submit_btn" class="btn btn-primary">
+							' . self::$module->l('Add new model', 'ScsForm') . '
+						</button>'
+        ],
+      ],
+    ];
+    return $form;
+  }
+
+  private static function createModelFields($formSettings)
+  {
+    $sliced = self::getSlicedAtrributesArray($formSettings['attr_group_id']);
+    $form['form'] = [
+      'legend' => [
+        'title' => self::$module->l('Add new dimension model for: ', 'ScsForm') . $formSettings['group_name'],
+        'icon' => 'icon-cogs'
+      ],
+      'input' => [
+        [
+          'type' => 'select',
+          'label' => self::$module->l('Start dimension', 'ScsForm'),
+          'name' => 'dim_start',
+          'options' => [
+            'query' => self::dimensionSelect($sliced['start']),
+            'id' => 'id_option',
+            'name' => 'name',
+          ],
+          'required' => true,
+        ],
+        [
+          'type' => 'select',
+          'label' => self::$module->l('End dimension', 'ScsForm'),
+          'name' => 'dim_end',
+          'options' => [
+            'query' => self::dimensionSelect($sliced['end']),
+            'id' => 'id_option',
+            'name' => 'name',
+          ],
+          'required' => true,
+        ],
+        [
+          'type' => 'text',
+          'label' => self::$module->l('Model name', 'ScsForm'),
+          'name' => 'name',
+          'size' => 64,
+          'required' => true,
+        ],
+        [
+          'type'  => 'html',
+          'html_content' => '<input type="hidden" value="' . $formSettings['attr_group_id'] . '" id="attr_group_id" name="attr_group_id">',
+        ],
+        [
+          'type'  => 'html',
+          'html_content' => '<input type="hidden"  value="' . $formSettings['no_properties'] . '"  id="no_properties" name="no_properties">'
+        ],
+      ],
+    ];
+    $submit = [
+      [
+        'type'  => 'html',
+        'html_content' => '
+        <button type="submit" value="1" id="configuration_form_submit_btn" class="btn btn-primary">
+      ' . self::$module->l('Save new model', 'ScsForm') . '</button>',
+      ]
+    ];
+    $form['form']['input'] = array_merge($form['form']['input'], self::getTextFields($formSettings['no_properties']), $submit);
+
+    return  $form;
+  }
+
+  private static function getTextFields($noTextInputs)
+  {
+    for ($i = 1; $i <= $noTextInputs; $i++) {
+      $output[] = [
+        'type'  => 'text',
+        'label' => self::$module->l('Name of property: ', 'ScsForm') . $i,
+        'name'  => 'property_' . $i,
+        'lang'  => true,
+      ];
     }
     return $output;
   }
 
-  /**
-   * Method returns an array with active attributes ids
-   * @param array $attributesGroups
-   * @param array $confValues array of arrays in "confValueFormat"
-   * @return array
-   */
-  private static function getActiveAttributes($attributesGroups, $confValues)
+  private static function dimensionSelect($attributesGroups)
   {
-    foreach ($attributesGroups as $group) {
-      $attributes[$group['id_attribute_group']] = Configuration::get($confValues[$group['id_attribute_group']]['is_active']['field_upper']);
+    foreach ($attributesGroups as $key => $name) {
+      $arr[] = [
+        'id_option' => $key,
+        'name' => $name,
+      ];
     }
-    $attributes = array_filter($attributes);
-    return array_keys($attributes);
+    return  $arr;
   }
 
-  /**
-   * Method returns an array of all group attributes divided in half 
-   * @param array $groupId
-   * @return array
-   */
+  private static function groupSelect($attributesGroups)
+  {
+    foreach ($attributesGroups as $group) {
+      $arr[] = [
+        'id_option' => $group['id_attribute_group'],
+        'name' => $group['name'],
+      ];
+    }
+    return  $arr;
+  }
+
+
   private static function getSlicedAtrributesArray($groupId): array
   {
     $attributes = ScsHelper::getAttributes($groupId, self::$module->contextLangId);
@@ -201,105 +204,50 @@ class ScsForm
     return $sliced;
   }
 
-  private static function groupsForm($elements): array
-  {
-    $fields_form['form'] = array(
-      'legend' => array(
-        'title' => self::$module->l('Select attribute groups for size table use'),
-        'icon' => 'icon-cogs'
-      ),
-      'input' => array_merge(
-        array(array('type' => 'free', 'name' => 'attribute_use_description', 'col' => 3, 'offset' => 0),),
-        $elements
-      ),
-      'submit' => array(
-        'title' => self::$module->l('Save'),
-        'class' => 'btn btn-default pull-right'
-      )
-    );
-    return $fields_form;
-  }
 
-  private static function dimensionsForm($elements): array
-  {
-    $fields_form['form'] = array(
-      'legend' => array(
-        'title' => self::$module->l('Choose basis of dimensions'),
-        'icon' => 'icon-cogs'
-      ),
-      'input' => $elements,
-      'submit' => array(
-        'title' => self::$module->l('Save'),
-        'class' => 'btn btn-default pull-right'
-      )
-    );
-    return $fields_form;
-  }
 
-  private static function elementGroupRadio($groupConfValue): array
-  {
-    return [
-      'type' => 'switch',
-      'label' => $groupConfValue['group_name'],
-      'name' => $groupConfValue['field_lower'],
-      'hint' => self::$module->l('Click "Yes" to set this attribute group for size table use'),
-      'is_bool' => true,
-      'desc' =>  self::$module->l('Attribute sizes') . ': ' . implode(', ', ScsHelper::getAttributes($groupConfValue['group_id'], self::$module->contextLangId)),
-      'values' => array(
-        array(
-          'id' => 'active_on',
-          'value' => 1,
-          'label' => self::$module->l('Enabled')
-        ),
-        array(
-          'id' => 'active_off',
-          'value' => 0,
-          'label' => self::$module->l('Disabled')
-        ),
-                array(
-          'id' => 'active_owff',
-          'value' => 2,
-          'label' => self::$module->l('Disabled')
-        )
-      ),
-    ];
-  }
 
-  private static function elementDimensionSelect($confValue, $sliced): array
-  {
-    return [
-      'type' => 'select',
-      'label' => ucfirst($confValue['label']),
-      'name' => $confValue['field_lower'],
-      'desc' =>  self::$module->l('Basic dimension for group: ') . $confValue['group_name'],
-      'options' => [
-        'query' => self::getGroupAttributesOptions($sliced[$confValue['field_name']]),
-        'id' => 'id_option',
-        'name' => 'name'
-      ],
-    ];
-  }
 
-  private static function getGroupAttributesOptions($attributes)
+
+
+  public static function getModels()
   {
-    foreach ($attributes as $key => $value) {
-      $arr[] = [
-        'id_option' => $key,
-        'name' => $value,
+
+    echo '<pre>';
+    //var_dump(ScsDb::dbModels());
+    echo '</pre>';
+
+
+    $models = ScsDb::dbModels();
+
+    $models = array_map(function ($item) {
+      return [
+        'id' => $item->id,
+        'name' => $item->name,
       ];
-    }
-    return  $arr;
+    }, $models);
+
+    $helper = new HelperList();
+
+    $helper->title = self::$module->l('Model list', 'ScsForm');
+    $helper->table = self::$module->name;
+    $helper->no_link = true;
+    $helper->shopLinkType = '';
+    $helper->identifier = 'id';
+    $helper->actions = array('edit', 'delete');
+
+    $values = $models;
+    $helper->listTotal = count($values);
+    $helper->tpl_vars = array('show_filters' => false);
+    $helper->token = Tools::getAdminTokenLite('AdminModules');
+    return $helper->generateList($values, self::getTasksList());
   }
 
-  private static function getAttributesDescription(): array
+  public static function getTasksList()
   {
-    $desc = '<div class="alert alert-info">
-                   <ul>
-                     <li>' . self::$module->l('Poniższe grupy atrybutów mogą zostać użyte do wygenerowania tabeli rozmiarów.') . '</li>
-                     <li>' . self::$module->l('Zwróć uwagę na to czy poszczególne rozmiary są ułożone od najmniejszego do największego.') . '</li>
-                     <li>' . self::$module->l('Ustawienie kolejności atrybutów można zmieniać za pomocą mechanizmu pozycji atrybutów') . '</li>
-                 </ul>
-                 </div>';
-    return array('attribute_use_description' => $desc);
+    return array(
+      'id' => array('title' => 'id', 'type' => 'text', 'orderby' => false),
+      'name' => array('title' => 'name', 'type' => 'text', 'orderby' => false),
+    );
   }
 }

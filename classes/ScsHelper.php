@@ -48,10 +48,27 @@ class ScsHelper
   }
 
   /**
-   * Remap mathod
+   * Remap method
    */
   private static function mapAttributes($att)
   {
     return  [$att['id_attribute'] => $att['name']];
+  }
+
+  /**
+   * Method an array lang properties from model
+   * @return array
+   */
+  public static function getLangProperties(): array
+  {
+    $langs = Language::getLanguages(true);
+    $no_properties = Tools::getValue('no_properties');
+    $arr = [];
+    for ($i = 1; $i <= $no_properties; $i++) {
+      foreach ($langs as $lang) {
+        $arr[$i][$lang['id_lang']] = Tools::getValue('property_' . $i . '_' . $lang['id_lang']);
+      }
+    }
+    return $arr;
   }
 }

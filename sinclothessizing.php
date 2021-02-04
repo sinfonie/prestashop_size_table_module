@@ -5,8 +5,7 @@ if (!defined('_PS_VERSION_')) {
 
 require_once(dirname(__FILE__) . '/classes/ScsHelper.php');
 require_once(dirname(__FILE__) . '/classes/ScsForm.php');
-require_once(dirname(__FILE__) . '/classes/ScsFormCreate.php');
-require_once(dirname(__FILE__) . '/classes/ScsConfiguration.php');
+require_once(dirname(__FILE__) . '/classes/ScsDb.php');
 
 class SinClothesSizing extends Module
 {
@@ -72,94 +71,75 @@ class SinClothesSizing extends Module
 
     public function getContent()
     {
-        ScsFormCreate::init($this);
-        $output = ScsFormCreate::submitNewModel();
+        ScsForm::init($this);
 
-        return '<div class="scs__admin">' . $output . $this->getForms() . '</div>';
+        ScsForm::getModels();
+
+        return '<div class="scs__admin col-lg-7">' . $this->getForms() . '</div>';
     }
 
-    public function getForms()
+    private function getForms(): string
     {
-        
+        $display = ScsForm::submitNewModel();
         $this->attributesGroups = ScsHelper::getGroupsAttributes($this->context->language->id);
-        //$this->groupsConfValues = ScsForm::getConfValues($this->attributesGroups);
-
+        $view = '';
+        $models = '';
         if (!empty($this->attributesGroups)) {
-            if (Tools::getValue('new_attr_group_id')) {
-                $noProperties = intval(Tools::getValue('no_properties'));
-                $noProperties = ($noProperties <= 1) ? 1 : $noProperties;
-                $formSettings = [
-                    'group_id' => Tools::getValue('new_attr_group_id'),
-                    'group_name' => $this->attributesGroups[Tools::getValue('new_attr_group_id')]['name'],
-                    'number_of_properties' => $noProperties,
-                ];
-                $result = ScsFormCreate::getAddForm($formSettings);
-                return '<div class="col-lg-7">' . $this->displayAddForm($result) . '</div>';
+            if (Tools::isSubmit('add_new_model_submit')) {
+                //create new model form
+                $result = ScsForm::createModelForm($this->attributesGroups);
+                $view .= $this->displayCreateForm($result);
             } else {
-                
-                $formValues = ScsFormCreate::getValues($this->attributesGroups);
-                return $this->displayForm($formValues);
+                //add new model form
+                $result = ScsForm::addModelForm($this->attributesGroups);
+                $view .= $this->displayAddForm($result);
             }
         } else {
-            return 'the is no attributes';
+            $view .= 'the is no attributes';
         }
-    }
 
-    /*     private function displayForm(): string
-    {
-        $default_lang = (int)Configuration::get('PS_LANG_DEFAULT');
-        $helper = new HelperForm();
-        $helper->module = $this;
-        $helper->name_controller = $this->name;
-        $helper->token = Tools::getAdminTokenLite('AdminModules');
-        $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
-        $helper->default_form_language = $default_lang;
-        $helper->allow_employee_form_lang = $default_lang;
-        $helper->title = $this->displayName;
-        $helper->submit_action = $this->name . '_submit';
-        $form = ScsForm::getFormData($this->attributesGroups, $this->groupsConfValues);
-        $helper->tpl_vars = ['fields_value' => $form['values']];
-        return $helper->generateForm($form['fields']);
-    } */
+        $models = ScsForm::getModels();
 
-    private function displayForm($form): string
-    {
-        $default_lang = (int)Configuration::get('PS_LANG_DEFAULT');
-        $helper = new HelperForm();
-        $helper->module = $this;
-        $helper->name_controller = $this->name;
-        $helper->token = Tools::getAdminTokenLite('AdminModules');
-        $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
-        $helper->default_form_language = $default_lang;
-        $helper->allow_employee_form_lang = $default_lang;
-        $helper->title = $this->displayName;
-        $helper->submit_action = $this->name . '_submit';
-        $helper->tpl_vars = ['fields_value' => $form['values']];
-        return $helper->generateForm($form['fields']);
+
+        unset($_POST);
+        return $display . $view . $models;
     }
 
     private function displayAddForm($form): string
     {
+        $helper = $this->getFormHelper();
+        $helper->submit_action = 'add_new_model_submit';
+        $helper->tpl_vars = ['fields_value' => $form['values']];
+        return $helper->generateForm($form['fields']);
+    }
+
+    private function displayCreateForm($form): string
+    {
+        $helper = $this->getFormHelper();
+        $helper->submit_action = 'create_new_model_submit';
+        $helper->tpl_vars = [
+            'languages' => $this->context->controller->getLanguages(),
+        ];
+        return $helper->generateForm($form['fields']);
+    }
+
+    private function getFormHelper()
+    {
         $default_lang = (int)Configuration::get('PS_LANG_DEFAULT');
         $helper = new HelperForm();
         $helper->module = $this;
         $helper->name_controller = $this->name;
         $helper->token = Tools::getAdminTokenLite('AdminModules');
         $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
-        $lang = new Language((int)Configuration::get('PS_LANG_DEFAULT'));
-        $helper->default_form_language = $lang->id;
+        $helper->default_form_language = $default_lang;
         $helper->allow_employee_form_lang = $default_lang;
         $helper->title = $this->displayName;
-        $helper->submit_action = $this->name . '_submit';
-        $helper->tpl_vars = [
-            'fields_value' => $form['values'],
-            'languages' => $this->context->controller->getLanguages(),
-        ];
-
-
-
-        return $helper->generateForm($form['fields']);
+        return $helper;
     }
+
+
+
+    /////////////////////////////////////////////
 
 
     private function realSizes()
