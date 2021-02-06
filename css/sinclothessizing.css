@@ -15,6 +15,10 @@
   text-align: left;
 }
 
+.scs__admin .scs__row {
+  padding-top: 7px;
+}
+
 .scs__admin input[type="number"] {
   width: 70px;
   height: 31px;

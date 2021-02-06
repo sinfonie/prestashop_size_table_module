@@ -63,11 +63,15 @@ class ScsDb extends ObjectModel
   }
 
 
-  public static function dbModel($id)
+  public static function dbModel(int $id)
   {
     $sql = 'SELECT `id`, `attr_group_id`, `dim_start`, `dim_end`, `name`, `properties`, `active` FROM `' . _DB_PREFIX_ . 'scs_configurations` ' .
-      'WHERE `id` = ' . $id;
-    return self::dbRequest($sql);
+      'WHERE `id` = ' . pSQL($id);
+    $result = self::dbRequest($sql);
+    if ($result && is_array($result)) {
+      return $result[0];
+    }
+    return $result;
   }
 
   private static function dbRequest($sql)

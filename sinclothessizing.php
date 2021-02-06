@@ -31,14 +31,10 @@ class SinClothesSizing extends Module
         $this->baseSizesNames = array('bust_s', 'bust_xl', 'waist_s', 'waist_xl', 'hips_s', 'hips_xl', 'length_s', 'length_xl');
         $this->dimentionsNames = array('bust', 'waist', 'hips', 'length');
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall?');
-
-        $this->contextLangId = $this->context->language->id;
-
         $this->realSizes = $this->realSizes();
         $this->getSizes = $this->getSizes();
 
-
-
+        $this->getContext();
         require_once dirname(__FILE__) . '/classes/SizeObject.php';
     }
 
@@ -73,36 +69,49 @@ class SinClothesSizing extends Module
     {
         ScsForm::init($this);
 
-        ScsForm::getModels();
-
         return '<div class="scs__admin col-lg-7">' . $this->getForms() . '</div>';
     }
 
     private function getForms(): string
     {
-        $display = ScsForm::submitNewModel();
-        $this->attributesGroups = ScsHelper::getGroupsAttributes($this->context->language->id);
-        $view = '';
-        $models = '';
-        if (!empty($this->attributesGroups)) {
+        $display = ScsForm::submitModel();
+        $models = ScsForm::getModels();
+        if (!empty(ScsForm::$attributesGroups)) {
             if (Tools::isSubmit('add_new_model_submit')) {
                 //create new model form
-                $result = ScsForm::createModelForm($this->attributesGroups);
-                $view .= $this->displayCreateForm($result);
+                $form = ScsForm::createModelForm();
+                $view = $this->displayCreateForm($form);
+            } elseif (Tools::isSubmit('update_model')) {
+                //update model from list
+                $form = ScsForm::updateModelForm();
+                $view = $this->displayUpdateForm($form);
             } else {
                 //add new model form
-                $result = ScsForm::addModelForm($this->attributesGroups);
-                $view .= $this->displayAddForm($result);
+                $form = ScsForm::addModelForm();
+                $view = $this->displayAddForm($form);
             }
         } else {
-            $view .= 'the is no attributes';
+            $view = 'the is no attributes';
         }
-
-        $models = ScsForm::getModels();
-
-
         unset($_POST);
         return $display . $view . $models;
+    }
+
+    private function getContext()
+    {
+        $this->languageID = $this->context->language->id;
+        $this->adminLink  = $this->context->link->getAdminLink('AdminModules', false);
+    }
+
+    private function displayUpdateForm($form): string
+    {
+        $helper = $this->getFormHelper();
+        $helper->submit_action = 'update_model_submit';
+        $helper->tpl_vars = [
+            'languages' => $this->context->controller->getLanguages(),
+            'fields_value' => $form['values'],
+        ];
+        return $helper->generateForm($form['fields']);
     }
 
     private function displayAddForm($form): string

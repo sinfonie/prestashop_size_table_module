@@ -40,9 +40,7 @@ class ScsHelper
     });
     $groups = [];
     if (!empty($filteredGroups)) {
-      foreach ($filteredGroups as $group) {
-        $groups[$group['id_attribute_group']] = $group;
-      }
+      $groups = array_column($filteredGroups, null, 'id_attribute_group');
     }
     return $groups;
   }
