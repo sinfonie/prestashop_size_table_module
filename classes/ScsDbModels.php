@@ -9,7 +9,7 @@ if (!defined('_PS_VERSION_')) {
   exit;
 }
 
-class ScsDb extends ObjectModel
+class ScsDbModels extends ObjectModel
 {
 
   public $id;
@@ -21,7 +21,7 @@ class ScsDb extends ObjectModel
   public $active;
 
   public static $definition = array(
-    'table' => 'scs_configurations',
+    'table' => 'scs_models',
     'primary' => 'id',
     'multilang' => true,
     'multilang_shop' => true,
@@ -29,14 +29,17 @@ class ScsDb extends ObjectModel
       'attr_group_id' => array(
         'type' => self::TYPE_INT,
         'validate' => 'isUnsignedInt',
+        'required' => true,
       ),
       'dim_start' => array(
         'type' => self::TYPE_INT,
         'validate' => 'isUnsignedInt',
+        'required' => true,
       ),
       'dim_end' => array(
         'type' => self::TYPE_INT,
         'validate' => 'isUnsignedInt',
+        'required' => true,
       ),
       'name' => array(
         'type' => self::TYPE_STRING,
@@ -46,26 +49,25 @@ class ScsDb extends ObjectModel
       'properties' => array(
         'type' => self::TYPE_STRING,
         'validate' => 'isString',
+        'required' => true,
       ),
       'active' => array(
         'type' => self::TYPE_BOOL,
         'validate' => 'isBool',
+        'required' => true,
       ),
     ),
   );
 
-
-
-  public static function dbModels()
+  public static function getModels()
   {
-    $sql = 'SELECT `id`, `attr_group_id`, `dim_start`, `dim_end`, `name`, `properties`, `active` FROM `' . _DB_PREFIX_ . 'scs_configurations`';
+    $sql = 'SELECT `id`, `attr_group_id`, `dim_start`, `dim_end`, `name`, `properties`, `active` FROM `' . _DB_PREFIX_ . 'scs_models`';
     return self::dbRequest($sql);
   }
 
-
-  public static function dbModel(int $id)
+  public static function getModel(int $id)
   {
-    $sql = 'SELECT `id`, `attr_group_id`, `dim_start`, `dim_end`, `name`, `properties`, `active` FROM `' . _DB_PREFIX_ . 'scs_configurations` ' .
+    $sql = 'SELECT `id`, `attr_group_id`, `dim_start`, `dim_end`, `name`, `properties`, `active` FROM `' . _DB_PREFIX_ . 'scs_models` ' .
       'WHERE `id` = ' . pSQL($id);
     $result = self::dbRequest($sql);
     if ($result && is_array($result)) {

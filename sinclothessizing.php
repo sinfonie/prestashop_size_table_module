@@ -5,7 +5,7 @@ if (!defined('_PS_VERSION_')) {
 
 require_once(dirname(__FILE__) . '/classes/ScsHelper.php');
 require_once(dirname(__FILE__) . '/classes/ScsForm.php');
-require_once(dirname(__FILE__) . '/classes/ScsDb.php');
+require_once(dirname(__FILE__) . '/classes/ScsDbModels.php');
 
 class SinClothesSizing extends Module
 {
@@ -34,7 +34,6 @@ class SinClothesSizing extends Module
         $this->realSizes = $this->realSizes();
         $this->getSizes = $this->getSizes();
 
-        $this->getContext();
         require_once dirname(__FILE__) . '/classes/SizeObject.php';
     }
 
@@ -67,34 +66,30 @@ class SinClothesSizing extends Module
 
     public function getContent()
     {
+        $this->getContext();
         ScsForm::init($this);
-
         return '<div class="scs__admin col-lg-7">' . $this->getForms() . '</div>';
     }
 
     private function getForms(): string
     {
-        $display = ScsForm::submitModel();
+        ScsForm::checkModelSubmit();
         $models = ScsForm::getModels();
         if (!empty(ScsForm::$attributesGroups)) {
             if (Tools::isSubmit('add_new_model_submit')) {
-                //create new model form
                 $form = ScsForm::createModelForm();
                 $view = $this->displayCreateForm($form);
             } elseif (Tools::isSubmit('update_model')) {
-                //update model from list
                 $form = ScsForm::updateModelForm();
                 $view = $this->displayUpdateForm($form);
             } else {
-                //add new model form
                 $form = ScsForm::addModelForm();
                 $view = $this->displayAddForm($form);
             }
         } else {
             $view = 'the is no attributes';
         }
-        unset($_POST);
-        return $display . $view . $models;
+        return ScsForm::$display . $view . $models;
     }
 
     private function getContext()
@@ -103,22 +98,28 @@ class SinClothesSizing extends Module
         $this->adminLink  = $this->context->link->getAdminLink('AdminModules', false);
     }
 
-    private function displayUpdateForm($form): string
+
+    private function getFormHelper()
     {
-        $helper = $this->getFormHelper();
-        $helper->submit_action = 'update_model_submit';
-        $helper->tpl_vars = [
-            'languages' => $this->context->controller->getLanguages(),
-            'fields_value' => $form['values'],
-        ];
-        return $helper->generateForm($form['fields']);
+        $default_lang = (int)Configuration::get('PS_LANG_DEFAULT');
+        $helper = new HelperForm();
+        $helper->module = $this;
+        $helper->name_controller = $this->name;
+        $helper->token = Tools::getAdminTokenLite('AdminModules');
+        $helper->currentIndex = ScsForm::$index;
+        $helper->default_form_language = $default_lang;
+        $helper->allow_employee_form_lang = $default_lang;
+        $helper->title = $this->displayName;
+        return $helper;
     }
 
     private function displayAddForm($form): string
     {
         $helper = $this->getFormHelper();
         $helper->submit_action = 'add_new_model_submit';
-        $helper->tpl_vars = ['fields_value' => $form['values']];
+        $helper->tpl_vars = [
+            'fields_value' => $form['values']
+        ];
         return $helper->generateForm($form['fields']);
     }
 
@@ -128,27 +129,34 @@ class SinClothesSizing extends Module
         $helper->submit_action = 'create_new_model_submit';
         $helper->tpl_vars = [
             'languages' => $this->context->controller->getLanguages(),
+            'show_cancel_button' => true,
+            'back_url' => ScsForm::$index . '&token=' . Tools::getAdminTokenLite('AdminModules'),
         ];
         return $helper->generateForm($form['fields']);
     }
 
-    private function getFormHelper()
+    private function displayUpdateForm($form): string
     {
-        $default_lang = (int)Configuration::get('PS_LANG_DEFAULT');
-        $helper = new HelperForm();
-        $helper->module = $this;
-        $helper->name_controller = $this->name;
-        $helper->token = Tools::getAdminTokenLite('AdminModules');
-        $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
-        $helper->default_form_language = $default_lang;
-        $helper->allow_employee_form_lang = $default_lang;
-        $helper->title = $this->displayName;
-        return $helper;
+        $helper = $this->getFormHelper();
+        $helper->submit_action = 'update_model_submit';
+        $helper->tpl_vars = [
+            'fields_value' => $form['values'],
+            'languages' => $this->context->controller->getLanguages(),
+            'show_cancel_button' => true,
+            'back_url' => ScsForm::$index . '&token=' . Tools::getAdminTokenLite('AdminModules'),
+        ];
+        return $helper->generateForm($form['fields']);
     }
 
 
 
-    /////////////////////////////////////////////
+
+
+
+
+
+
+
 
 
     private function realSizes()

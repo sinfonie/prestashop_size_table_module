@@ -16,7 +16,7 @@ $sql[] = 'CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . 'sin_clothes_sizing` (
     PRIMARY KEY  (`id`)
 ) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8;';
 
-$sql[] = 'CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . 'scs_configurations` (
+$sql[] = 'CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . 'scs_models` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
 	`attr_group_id` int(11) NOT NULL,
 	`dim_start` int(11) NOT NULL,
