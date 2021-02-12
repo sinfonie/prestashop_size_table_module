@@ -19,12 +19,9 @@ class ScsHelper
    */
   public static function getAttributes($id_group, $lang = 'en'): array
   {
-    $attributes = array_map('self::mapAttributes', AttributeGroup::getAttributes($lang, $id_group));
-    $output = [];
-    foreach ($attributes as $val) {
-      $output[key($val)] = $val[key($val)];
-    }
-    return $output;
+    $attributes = AttributeGroup::getAttributes($lang, $id_group);
+    if ($attributes && !empty($attributes)) return array_column($attributes, 'name', 'id_attribute');
+    return array();
   }
 
   /**
@@ -45,13 +42,7 @@ class ScsHelper
     return $groups;
   }
 
-  /**
-   * Remap method
-   */
-  private static function mapAttributes($att)
-  {
-    return  [$att['id_attribute'] => $att['name']];
-  }
+
 
   /**
    * Method an array lang properties from model

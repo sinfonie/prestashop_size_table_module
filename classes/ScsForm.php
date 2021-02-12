@@ -11,62 +11,122 @@ if (!defined('_PS_VERSION_')) {
 class ScsForm
 {
   private static $module = false;
-  public static $attributesGroups;
-  public static $index;
-  public static $display;
 
   public static function init(SinClothesSizing $module)
   {
     if (self::$module == false) {
       self::$module = $module;
     }
-    self::$attributesGroups = ScsHelper::getGroupsAttributes(self::$module->languageID);
-    self::$index = self::$module->adminLink . '&configure=' . self::$module->name . '&tab_module=' . self::$module->tab . '&module_name=' . self::$module->name;
-    self::$display = '';
+
+    $instance = new self;
+    $instance->attributesGroups = ScsHelper::getGroupsAttributes(self::$module->contextLanguageID);
+    $instance->index = self::$module->contextAdminLink . '&configure=' . self::$module->name . '&tab_module=' . self::$module->tab . '&module_name=' . self::$module->name;
+    $instance->token = Tools::getAdminTokenLite('AdminModules');
+    $instance->display = '';
+    return $instance;
   }
 
-  public static function checkModelSubmit(): void
+  public function getHTML(): string
+  {
+    $this->checkModelSubmit();
+    $models = $this->getModelsList();
+    if (!empty($this->attributesGroups)) {
+      if (Tools::isSubmit('add_new_model_submit')) {
+        $view = $this->displayCreateForm();
+      } elseif (Tools::isSubmit('update_model')) {
+        $view = $this->displayUpdateForm();
+      } else {
+        $view = $this->displayAddForm();
+      }
+    } else {
+      $view = 'there is no attributes';
+    }
+    return $this->display . $view . $models;
+  }
+
+  ### model submit ###
+
+  private function checkModelSubmit(): void
   {
     if (Tools::isSubmit('create_new_model_submit')) {
-      self::submitNewModel();
+      $this->submitNewModel();
     } elseif (Tools::isSubmit('update_model_submit')) {
-      self::submitUpdateModel();
+      $this->submitUpdateModel();
     }
   }
 
-  public static function addModelForm(): array
+  private function submitNewModel(): void
   {
-    $form = [];
-    $form['values']['attr_group_id'] = null;
-    $form['fields'][0] = self::addModelFields();
-    return $form;
+    if (Tools::isSubmit('create_new_model_submit')) {
+      $model = new ScsDbModels;
+      foreach (array_keys(ScsDbModels::$definition['fields']) as $field) {
+        if ($field == 'properties') continue;
+        if ($field == 'active') continue;
+        $model->$field = Tools::getValue($field);
+      }
+      $model->active = true;
+      $model->properties = serialize(ScsHelper::getLangProperties());
+      $this->validateAndDisplay($model, 'save');
+    }
   }
 
-  public static function createModelForm(): array
+  private function submitUpdateModel(): void
   {
-    $noProperties = intval(Tools::getValue('no_properties'));
-    $noProperties = ($noProperties <= 1) ? 1 : $noProperties;
-    $formSettings = [
-      'attr_group_id' => Tools::getValue('attr_group_id'),
-      'group_name' => self::$attributesGroups[Tools::getValue('attr_group_id')]['name'],
-      'no_properties' => $noProperties,
-    ];
-    $form = [];
-    $form['fields'][0] = self::createModelFields($formSettings);
-    return $form;
+    $model = new ScsDbModels;
+    $model = $model->getModel((int)Tools::getValue('id'));
+    $model->name = Tools::getValue('name');
+    $model->active = Tools::getValue('active');
+    $model->properties = serialize(ScsHelper::getLangProperties());
+    $this->validateAndDisplay($model, 'update');
   }
 
-  public static function updateModelForm(): array
+  private function validateAndDisplay(ScsDbModels $model, string $text): void
   {
-    $form = [];
-    $form['values'] = self::getUpdateFormValues();
-    $form['fields'][0] = self::updateModelFields($form['values']);
-    return $form;
+    if ($this->isUnique($model, $text)) {
+      if ($model->validateFields()) {
+        $model->$text();
+        $this->display = self::$module->displayConfirmation(self::$module->l(ucfirst($text) . ' success', 'ScsForm'));
+      } else {
+        $this->display = self::$module->displayError(self::$module->l(ucfirst($text) . ' failure', 'ScsForm'));
+      }
+    } else {
+      $this->display = self::$module->displayError(self::$module->l('This model already exists', 'ScsForm'));
+    }
   }
 
-  public static function getModels(): string
+  private function isUnique($model, $text): bool
   {
-    $models = self::prepareModels();
+    if ($text == 'save') {
+      $models =  new ScsDbModels;
+      $models = array_filter($models->getModels(), function ($m) use ($model) {
+        unset($model->id);
+        unset($m->id);
+        return ($model == $m);
+      });
+      if (!empty($models)) return false;
+    }
+    return true;
+  }
+
+  ### basic helpers ###
+
+  private function getFormHelper()
+  {
+    $default_lang = (int)Configuration::get('PS_LANG_DEFAULT');
+    $helper = new HelperForm();
+    $helper->module = self::$module;
+    $helper->name_controller = self::$module->name;
+    $helper->token = $this->token;
+    $helper->currentIndex = $this->index;
+    $helper->default_form_language = $default_lang;
+    $helper->allow_employee_form_lang = $default_lang;
+    $helper->title = self::$module->displayName;
+    return $helper;
+  }
+
+  private function getModelsList(): string
+  {
+    $models = $this->prepareModels();
     $helper = new HelperList();
     $helper->title = self::$module->l('Model list', 'ScsForm');
     $helper->table = '_model';
@@ -77,12 +137,35 @@ class ScsForm
     $helper->actions = array('edit');
     $helper->listTotal = count($models);
     $helper->tpl_vars = array('show_filters' => false);
-    $helper->token = Tools::getAdminTokenLite('AdminModules');
-    $helper->currentIndex = self::$index;
-    return $helper->generateList($models, self::getModelList());
+    $helper->token = $this->token;
+    $helper->currentIndex = $this->index;
+    return $helper->generateList($models, $this->getListColumns());
   }
 
-  private static function addModelFields(): array
+
+
+  ### Add model process ###
+
+  private function displayAddForm(): string
+  {
+    $form = $this->addModelForm();
+    $helper = $this->getFormHelper();
+    $helper->submit_action = 'add_new_model_submit';
+    $helper->tpl_vars = [
+      'fields_value' => $form['values']
+    ];
+    return $helper->generateForm($form['fields']);
+  }
+
+  private function addModelForm(): array
+  {
+    $form = [];
+    $form['values']['attr_group_id'] = null;
+    $form['fields'][0] = $this->addModelFields();
+    return $form;
+  }
+
+  private function addModelFields(): array
   {
     $form['form'] = [
       'legend' => [
@@ -95,7 +178,7 @@ class ScsForm
           'label' => self::$module->l('Select and add new model', 'ScsForm'),
           'name' => 'attr_group_id',
           'options' => [
-            'query' => self::groupSelect(),
+            'query' => $this->groupSelect(),
             'id' => 'id_option',
             'name' => 'name',
           ],
@@ -116,9 +199,49 @@ class ScsForm
     return $form;
   }
 
-  private static function createModelFields($formSettings): array
+  private function groupSelect(): array
   {
-    $sliced = self::getSlicedAtrributesArray($formSettings['attr_group_id']);
+    $arr = array_map(function ($group) {
+      return [
+        'id_option' => $group['id_attribute_group'],
+        'name' => $group['name'],
+      ];
+    }, $this->attributesGroups);
+    return  $arr;
+  }
+
+  ### Create model process ###
+
+  private function displayCreateForm(): string
+  {
+    $form = $this->createModelForm();
+    $helper = $this->getFormHelper();
+    $helper->submit_action = 'create_new_model_submit';
+    $helper->tpl_vars = [
+      'languages' => self::$module->contextLanguages,
+      'show_cancel_button' => true,
+      'back_url' => $this->index . '&token=' . Tools::getAdminTokenLite('AdminModules'),
+    ];
+    return $helper->generateForm($form['fields']);
+  }
+
+  private function createModelForm(): array
+  {
+    $noProperties = intval(Tools::getValue('no_properties'));
+    $noProperties = ($noProperties <= 1) ? 1 : $noProperties;
+    $formSettings = [
+      'attr_group_id' => Tools::getValue('attr_group_id'),
+      'group_name' => $this->attributesGroups[Tools::getValue('attr_group_id')]['name'],
+      'no_properties' => $noProperties,
+    ];
+    $form = [];
+    $form['fields'][0] = $this->createModelFields($formSettings);
+    return $form;
+  }
+
+  private function createModelFields($formSettings): array
+  {
+    $sliced = $this->getSlicedAtrributesArray($formSettings['attr_group_id']);
     $form['form'] = [
       'legend' => [
         'title' => self::$module->l('Add new dimension model for: ', 'ScsForm') . $formSettings['group_name'],
@@ -131,7 +254,7 @@ class ScsForm
           'name' => 'dim_start',
           'required' => true,
           'options' => [
-            'query' => self::dimensionSelect($sliced['start']),
+            'query' => $this->dimensionSelect($sliced['start']),
             'id' => 'id_option',
             'name' => 'name',
           ],
@@ -142,7 +265,7 @@ class ScsForm
           'name' => 'dim_end',
           'required' => true,
           'options' => [
-            'query' => self::dimensionSelect($sliced['end']),
+            'query' => $this->dimensionSelect($sliced['end']),
             'id' => 'id_option',
             'name' => 'name',
           ],
@@ -173,12 +296,70 @@ class ScsForm
       ' . self::$module->l('Save new model', 'ScsForm') . '</button>',
       ]
     ];
-    $form['form']['input'] = array_merge($form['form']['input'], self::getTextFields($formSettings['no_properties']), $submit);
+    $form['form']['input'] = array_merge($form['form']['input'], $this->getTextFields($formSettings['no_properties']), $submit);
 
     return  $form;
   }
 
-  private static function getUpdateFormValues(): array
+  private function getSlicedAtrributesArray($groupId): array
+  {
+    $attributes = ScsHelper::getAttributes($groupId, self::$module->contextLanguageID);
+
+    $middle = (int)floor(count($attributes) / 2);
+    $sliced['start'] = array_slice($attributes, 0, $middle, true);
+    $sliced['end'] = array_slice($attributes, $middle, null, true);
+    return $sliced;
+  }
+
+  private function dimensionSelect(array $dimensions): array
+  {
+    array_walk($dimensions, function (&$dimension, $key) {
+      $dimension = [
+        'id_option' => $key,
+        'name' => $dimension,
+      ];
+    });
+    return $dimensions;
+  }
+
+  private function getTextFields($noTextInputs): array
+  {
+    for ($i = 1; $i <= $noTextInputs; $i++) {
+      $output[] = [
+        'type'  => 'text',
+        'label' => self::$module->l('Name of property: ', 'ScsForm') . $i,
+        'name'  => 'property_' . $i,
+        'lang'  => true,
+      ];
+    }
+    return $output;
+  }
+
+  ### Update model process ###
+
+  private function displayUpdateForm(): string
+  {
+    $form = $this->updateModelForm();
+    $helper = $this->getFormHelper();
+    $helper->submit_action = 'update_model_submit';
+    $helper->tpl_vars = [
+      'fields_value' => $form['values'],
+      'languages' => self::$module->contextLanguages,
+      'show_cancel_button' => true,
+      'back_url' => $this->index . '&token=' . Tools::getAdminTokenLite('AdminModules'),
+    ];
+    return $helper->generateForm($form['fields']);
+  }
+
+  private function updateModelForm(): array
+  {
+    $form = [];
+    $form['values'] = $this->getUpdateFormValues();
+    $form['fields'][0] = $this->updateModelFields($form['values']);
+    return $form;
+  }
+
+  private function getUpdateFormValues(): array
   {
     $id = Tools::getValue('id');
     $model = ScsDbModels::getModel($id);
@@ -193,7 +374,7 @@ class ScsForm
       'properties' => $properties,
       'no_properties' => $noProperties,
       'active' => $model->active,
-      'group_name' => self::$attributesGroups[$model->attr_group_id]['name'],
+      'group_name' => $this->attributesGroups[$model->attr_group_id]['name'],
     ];
     foreach ($properties as $propID => $property) {
       $values['property_' . $propID] = $property;
@@ -201,7 +382,7 @@ class ScsForm
     return $values;
   }
 
-  private static function updateModelFields($values): array
+  private function updateModelFields($values): array
   {
     $form['form'] = [
       'legend' => [
@@ -265,112 +446,31 @@ class ScsForm
         'html_content' => '<input type="hidden" id="id" value="' . $values['id'] . '"  name="id">'
       ],
     ];
-    $form['form']['input'] = array_merge($form['form']['input'], self::getTextFields($values['no_properties']), $hidden);
+    $form['form']['input'] = array_merge($form['form']['input'], $this->getTextFields($values['no_properties']), $hidden);
 
     return  $form;
   }
 
-  private static function getTextFields($noTextInputs): array
-  {
-    for ($i = 1; $i <= $noTextInputs; $i++) {
-      $output[] = [
-        'type'  => 'text',
-        'label' => self::$module->l('Name of property: ', 'ScsForm') . $i,
-        'name'  => 'property_' . $i,
-        'lang'  => true,
-      ];
-    }
-    return $output;
-  }
+  ### model list ###
 
-  private static function dimensionSelect(array $dimensions): array
-  {
-    array_walk($dimensions, function (&$dimension, $key) {
-      $dimension = [
-        'id_option' => $key,
-        'name' => $dimension,
-      ];
-    });
-    return $dimensions;
-  }
-
-  private static function groupSelect(): array
-  {
-    $arr = array_map(function ($group) {
-      return [
-        'id_option' => $group['id_attribute_group'],
-        'name' => $group['name'],
-      ];
-    }, self::$attributesGroups);
-    return  $arr;
-  }
-
-
-  private static function getSlicedAtrributesArray($groupId): array
-  {
-    $attributes = ScsHelper::getAttributes($groupId, self::$module->languageID);
-
-    $middle = (int)floor(count($attributes) / 2);
-    $sliced['start'] = array_slice($attributes, 0, $middle, true);
-    $sliced['end'] = array_slice($attributes, $middle, null, true);
-    return $sliced;
-  }
-
-
-  private static function prepareModels()
+  private function prepareModels(): array
   {
     return array_map(function ($item) {
       return [
         'id' => $item->id,
         'name' => $item->name,
-        'attribute' => self::$attributesGroups[$item->attr_group_id]['name'],
+        'attribute' => $this->attributesGroups[$item->attr_group_id]['name'],
         'used_in' => 0 . ' ' . self::$module->l('products', 'ScsForm'),
       ];
     }, ScsDbModels::getModels());
   }
 
-  private static function getModelList()
+  private function getListColumns(): array
   {
-    return array(
-      'name' => array('title' => self::$module->l('Name', 'ScsForm'), 'type' => 'text', 'orderby' => false),
-      'attribute' => array('title' => self::$module->l('Attributes group', 'ScsForm'), 'type' => 'text', 'orderby' => false),
-      'used_in' => array('title' => self::$module->l('Used in', 'ScsForm'), 'type' => 'text', 'orderby' => false),
-    );
-  }
-
-
-  private static function submitUpdateModel(): void
-  {
-    $model = new ScsDbModels;
-    $model = $model->getModel((int)Tools::getValue('id'));
-    $model->name = Tools::getValue('name');
-    $model->active = Tools::getValue('active');
-    $model->properties = serialize(ScsHelper::getLangProperties());
-    self::validateAndDisplay($model, 'update');
-  }
-
-  private static function submitNewModel(): void
-  {
-    if (Tools::isSubmit('create_new_model_submit')) {
-      $model = new ScsDbModels;
-      foreach (array_keys(ScsDbModels::$definition['fields']) as $field) {
-        if ($field == 'properties') continue;
-        if ($field == 'active') continue;
-        $model->$field = Tools::getValue($field);
-      }
-      $model->active = true;
-      $model->properties = serialize(ScsHelper::getLangProperties());
-      self::validateAndDisplay($model, 'save');
-    }
-  }
-
-  private static function validateAndDisplay(ScsDbModels $model, string $text): void
-  {
-    if ($model->validateFields()) {
-      $model->$text();
-      self::$display = self::$module->displayConfirmation(self::$module->l(ucfirst($text) . ' success', 'ScsForm'));
-    } else {
-      self::$display = self::$module->displayError(self::$module->l(ucfirst($text) . ' failure', 'ScsForm'));
-    }
+    return [
+      'name' => ['title' => self::$module->l('Name', 'ScsForm'), 'type' => 'text', 'orderby' => false],
+      'attribute' => ['title' => self::$module->l('Attributes group', 'ScsForm'), 'type' => 'text', 'orderby' => false],
+      'used_in' => ['title' => self::$module->l('Used in', 'ScsForm'), 'type' => 'text', 'orderby' => false],
+    ];
   }
 }
