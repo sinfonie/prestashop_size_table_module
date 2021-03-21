@@ -6,6 +6,7 @@ if (!defined('_PS_VERSION_')) {
 require_once(dirname(__FILE__) . '/classes/ScsHelper.php');
 require_once(dirname(__FILE__) . '/classes/ScsForm.php');
 require_once(dirname(__FILE__) . '/classes/ScsDbModels.php');
+require_once(dirname(__FILE__) . '/classes/ScsDbProducts.php');
 
 class SinClothesSizing extends Module
 {
@@ -31,8 +32,8 @@ class SinClothesSizing extends Module
         $this->baseSizesNames = array('bust_s', 'bust_xl', 'waist_s', 'waist_xl', 'hips_s', 'hips_xl', 'length_s', 'length_xl');
         $this->dimentionsNames = array('bust', 'waist', 'hips', 'length');
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall?');
-        $this->realSizes = $this->realSizes();
-        $this->getSizes = $this->getSizes();
+        //$this->realSizes = $this->realSizes();
+        //  $this->getSizes = $this->getSizes();
 
         require_once dirname(__FILE__) . '/classes/SizeObject.php';
     }
@@ -69,12 +70,127 @@ class SinClothesSizing extends Module
         $this->contextLanguages = $this->context->controller->getLanguages();
         $this->contextLanguageID = $this->context->language->id;
         $this->contextAdminLink  = $this->context->link->getAdminLink('AdminModules', false);
-        $this->contextSmarty = $this->context->smarty;
         $forms = ScsForm::init($this);
         return '<div class="scs__admin col-lg-7">' . $forms->getHTML() . '</div>';
     }
 
-    private function realSizes()
+    private function getDimensionsForm($id_product, $dimensions)
+    {
+ 
+        $models = ScsDbModels::getModels($this->context->language->id);
+        if (!empty($models)) {
+            $model_data = [];
+            foreach ($models as $model) {
+                $atts = ScsHelper::getAttributes($model->attr_group_id, $this->context->language->id);
+                $dim = [
+                    $model->dim_start => $atts[$model->dim_start],
+                    $model->dim_end => $atts[$model->dim_end],
+                ];
+                $model_data[$model->id_model] = [
+                    'id_attribute_group' => $model->attr_group_id,
+                    'dim' => $dim,
+                    'name' => $model->name,
+                    'properties' => unserialize($model->properties[$this->context->language->id]),
+                ];
+            }
+            $this->context->smarty->assign(array(
+                'lang' => $this->context->language->id,
+                'model_data' => $model_data,
+            ));
+        }
+    }
+
+    public function hookDisplayAdminProductsExtra($params)
+    {
+        if (!in_array(Tools::getValue('id_product'), array(false, 0, '0'), true)) {
+            $id_product = (int)Tools::getValue('id_product');
+            $dimensions = ScsDbProducts::getProductDimensions($id_product);
+            $this->getDimensionsForm($id_product, $dimensions);
+
+            return $this->display(__FILE__, 'product_tab.tpl');
+        } else {
+            $this->context->controller->warnings[] = $this->l(
+                'You must save this product before configuring sizes.'
+            );
+        }
+
+        /*if (!in_array(Tools::getValue('id_product'), array(false, 0, '0'), true)) {
+            $this->context->smarty->assign(array(
+                'sizes' => $this->getSizes,
+                'visible' => $this->isVisible(),
+                'contents' => $this->contents(),
+                'show' => $this->showTable(),
+            ));
+            return $this->display(__FILE__, 'sinclothessizing_admin.tpl');
+        } else {
+            $this->context->controller->warnings[] = $this->l(
+                'You must save this product before configuring sizes.'
+            );
+        } */
+    }
+
+    public function hookActionProductUpdate($params)
+    {
+        /* $objects = SizeObject::getSizeObjects($this->id_product);
+        if (!$objects) {
+            foreach ($this->countSize() as $value) {
+                if ($value != null) {
+                    $result = true;
+                    break;
+                } else {
+                    $result = false;
+                }
+            }
+            if ($result) {
+                $objects = $this->createSizeObjects();
+                foreach ($objects as $object) {
+                    $object->save();
+                }
+            } else {
+                return false;
+            }
+        } else {
+            foreach ($objects as $object) {
+                $arraySizes = array_flip($this->arraySizes);
+                foreach ($this->dimentionsNames as $name) {
+                    if (($this->countSize()[$name . '_' . $arraySizes[$object->id_size]]) == null) {
+                        $object->$name = $object->$name;
+                    } else {
+                        $object->$name = $this->countSize()[$name . '_' . $arraySizes[$object->id_size]];
+                    }
+                }
+                $object->active = $this->extremeSizes($object->id_size);
+                $object->save();
+            }
+        } */
+    }
+
+    public function hookActionObjectProductDeleteAfter($params)
+    {
+        //SizeObject::deleteProductData($this->id_product);
+    }
+
+    public function hookDisplayRightColumnProduct($params)
+    {
+
+        /*         $product = new Product($this->id_product);
+        $this->context->smarty->assign(
+            array(
+                'product_reference' => $product->reference,
+                'sizes' => $this->getSizes,
+                'visible' => $this->isVisible(),
+                'contents' => $this->contents(),
+                'show' => $this->showTable(),
+            )
+        );
+        return $this->display(__FILE__, 'sinclothessizing.tpl'); */
+    }
+
+
+
+
+
+    /*    private function realSizes()
     {
         $product = new Product($this->id_product);
         $attr = $product->getAttributeCombinations(Context::getContext()->language->id);
@@ -249,7 +365,7 @@ class SinClothesSizing extends Module
             }
         }
         return (($foundNullValue) || ($isNull)) ? false : true;
-    }
+    } */
 
     public function hookHeader()
     {
@@ -261,7 +377,7 @@ class SinClothesSizing extends Module
         $this->context->controller->addCSS($this->_path . 'css/sinclothessizing.css', 'all');
     }
 
-    public function hookDisplayAdminProductsExtra($params)
+    /*     public function hookDisplayAdminProductsExtra($params)
     {
         if (!in_array(Tools::getValue('id_product'), array(false, 0, '0'), true)) {
             $this->context->smarty->assign(array(
@@ -275,6 +391,42 @@ class SinClothesSizing extends Module
             $this->context->controller->warnings[] = $this->l(
                 'You must save this product before configuring sizes.'
             );
+        }
+    } */
+
+    /*     public function hookActionProductUpdate($params)
+    {
+        $objects = SizeObject::getSizeObjects($this->id_product);
+        if (!$objects) {
+            foreach ($this->countSize() as $value) {
+                if ($value != null) {
+                    $result = true;
+                    break;
+                } else {
+                    $result = false;
+                }
+            }
+            if ($result) {
+                $objects = $this->createSizeObjects();
+                foreach ($objects as $object) {
+                    $object->save();
+                }
+            } else {
+                return false;
+            }
+        } else {
+            foreach ($objects as $object) {
+                $arraySizes = array_flip($this->arraySizes);
+                foreach ($this->dimentionsNames as $name) {
+                    if (($this->countSize()[$name . '_' . $arraySizes[$object->id_size]]) == null) {
+                        $object->$name = $object->$name;
+                    } else {
+                        $object->$name = $this->countSize()[$name . '_' . $arraySizes[$object->id_size]];
+                    }
+                }
+                $object->active = $this->extremeSizes($object->id_size);
+                $object->save();
+            }
         }
     }
 
@@ -312,17 +464,14 @@ class SinClothesSizing extends Module
                 $object->save();
             }
         }
-    }
+    } */
 
-    public function hookActionObjectProductDeleteAfter($params)
+    /*     public function hookActionObjectProductDeleteAfter($params)
     {
         SizeObject::deleteProductData($this->id_product);
-    }
+    } */
 
-
-
-
-    public function hookDisplayRightColumnProduct($params)
+    /*     public function hookDisplayRightColumnProduct($params)
     {
 
         $product = new Product($this->id_product);
@@ -336,5 +485,5 @@ class SinClothesSizing extends Module
             )
         );
         return $this->display(__FILE__, 'sinclothessizing.tpl');
-    }
+    } */
 }

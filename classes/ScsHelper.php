@@ -2,7 +2,7 @@
 
 /**
  * ScsHelper
- * @author Maciej Rumiński <ruminski.maciej@gmail.com>
+ * @author <sinfonie@o2.pl>
  */
 
 if (!defined('_PS_VERSION_')) {
@@ -13,11 +13,11 @@ class ScsHelper
 {
   /**
    * Method returns re-mapped attribute group where keys are  `id_attribute` and values are `name` 
-   * @param array $lang
-   * @param array $id_group
+   * @param int $lang
+   * @param int $id_group
    * @return array
    */
-  public static function getAttributes($id_group, $lang = 'en'): array
+  public static function getAttributes(int $id_group, int $lang): array
   {
     $attributes = AttributeGroup::getAttributes($lang, $id_group);
     if ($attributes && !empty($attributes)) return array_column($attributes, 'name', 'id_attribute');
@@ -26,10 +26,10 @@ class ScsHelper
 
   /**
    * Method returns non color groups
-   * @param array $lang
+   * @param int $lang
    * @return array
    */
-  public static function getGroupsAttributes($lang = 'en'): array
+  public static function getGroupsAttributes(int $lang): array
   {
     $attributeGroups = AttributeGroup::getAttributesGroups($lang);
     $filteredGroups = array_filter($attributeGroups, function ($att) {
@@ -42,21 +42,24 @@ class ScsHelper
     return $groups;
   }
 
-
-
   /**
-   * Method an array lang properties from model
+   * Method returns an array of lang properties from model
    * @return array
    */
-  public static function getLangProperties(): array
+  public static function getLangProperties($serialized = false): array
   {
     $langs = Language::getLanguages(true);
     $no_properties = Tools::getValue('no_properties');
     $arr = [];
     for ($i = 1; $i <= $no_properties; $i++) {
       foreach ($langs as $lang) {
-        $arr[$i][$lang['id_lang']] = Tools::getValue('property_' . $i . '_' . $lang['id_lang']);
+        $arr[$lang['id_lang']][$i] = Tools::getValue('property_' . $i . '_' . $lang['id_lang']);
       }
+    }
+    if ($serialized) {
+      array_walk($arr, function (&$val) {
+        $val = serialize($val);
+      });
     }
     return $arr;
   }

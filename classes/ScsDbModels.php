@@ -1,8 +1,8 @@
 <?php
 
 /**
- * ScsSql
- * @author Maciej Rumiński <ruminski.maciej@gmail.com>
+ * ScsDbModels
+ * @author <sinfonie@o2.pl>
  */
 
 if (!defined('_PS_VERSION_')) {
@@ -11,8 +11,7 @@ if (!defined('_PS_VERSION_')) {
 
 class ScsDbModels extends ObjectModel
 {
-
-  public $id;
+  public $id_model;
   public $attr_group_id;
   public $dim_start;
   public $dim_end;
@@ -22,9 +21,8 @@ class ScsDbModels extends ObjectModel
 
   public static $definition = array(
     'table' => 'scs_models',
-    'primary' => 'id',
+    'primary' => 'id_model',
     'multilang' => true,
-    'multilang_shop' => true,
     'fields' => array(
       'attr_group_id' => array(
         'type' => self::TYPE_INT,
@@ -48,8 +46,9 @@ class ScsDbModels extends ObjectModel
       ),
       'properties' => array(
         'type' => self::TYPE_STRING,
+        'lang' => true,
         'validate' => 'isString',
-        'required' => true,
+        'size' => 255
       ),
       'active' => array(
         'type' => self::TYPE_BOOL,
@@ -59,19 +58,31 @@ class ScsDbModels extends ObjectModel
     ),
   );
 
-  public static function getModels()
+  public static function getModels(int $lang = null)
   {
-    $sql = 'SELECT `id`, `attr_group_id`, `dim_start`, `dim_end`, `name`, `properties`, `active` FROM `' . _DB_PREFIX_ . 'scs_models`';
-    return self::dbRequest($sql);
+    $query = new DbQuery();
+    $query->select('m.`id_model`, m.`attr_group_id`, m.`dim_start`, m.`dim_end`, m.`name`, ml.`properties`, m.`active`, ml.id_lang');
+    $query->from('scs_models', 'm');
+    $query->leftJoin('scs_models_lang', 'ml', 'm.id_model = ml.id_model');
+    if (!is_null($lang)) {
+      $query->where('ml.`id_lang` = ' . pSQL($lang));
+    }
+    return self::dbRequest($query);
   }
 
-  public static function getModel(int $id)
+  public static function getModel(int $id, int $lang = null)
   {
-    $sql = 'SELECT `id`, `attr_group_id`, `dim_start`, `dim_end`, `name`, `properties`, `active` FROM `' . _DB_PREFIX_ . 'scs_models` ' .
-      'WHERE `id` = ' . pSQL($id);
-    $result = self::dbRequest($sql);
+    $query = new DbQuery();
+    $query->select('m.`id_model`, m.`attr_group_id`, m.`dim_start`, m.`dim_end`, m.`name`, ml.`properties`, m.`active`, ml.id_lang');
+    $query->from('scs_models', 'm');
+    $query->leftJoin('scs_models_lang', 'ml', 'm.id_model = ml.id_model');
+    $query->where('m.`id_model` = ' . pSQL($id));
+    if (!is_null($lang)) {
+      $query->where('ml.`id_lang` = ' . pSQL($lang));
+    }
+    $result = self::dbRequest($query);
     if ($result && is_array($result)) {
-      return $result[0];
+      return $result[key($result)];
     }
     return $result;
   }
@@ -84,15 +95,19 @@ class ScsDbModels extends ObjectModel
       return false;
     } else {
       foreach ($request as $v) {
-        $object = new self();
-        $object->id = $v['id'];
-        $object->attr_group_id = $v['attr_group_id'];
-        $object->dim_start = $v['dim_start'];
-        $object->dim_end = $v['dim_end'];
-        $object->name = $v['name'];
-        $object->properties = $v['properties'];
-        $object->active = $v['active'];
-        $array[] = $object;
+        $o = new self();
+        $o->id_model = $v['id_model'];
+        $o->attr_group_id = $v['attr_group_id'];
+        $o->dim_start = $v['dim_start'];
+        $o->dim_end = $v['dim_end'];
+        $o->name = $v['name'];
+        $o->active = $v['active'];
+        if (isset($array[$v['id_model']])) {
+          $o->properties = $array[$v['id_model']]->properties + [$v['id_lang'] => $v['properties']];
+        } else {
+          $o->properties = [$v['id_lang'] => $v['properties']];
+        }
+        $array[$v['id_model']] = $o;
       }
       return $array;
     }

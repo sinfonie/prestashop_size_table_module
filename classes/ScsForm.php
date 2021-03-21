@@ -1,7 +1,8 @@
 <?php
 
 /**
- * @author Maciej Rumiński <ruminski.maciej@gmail.com>
+ * ScsForm
+ * @author <sinfonie@o2.pl>
  */
 
 if (!defined('_PS_VERSION_')) {
@@ -11,6 +12,10 @@ if (!defined('_PS_VERSION_')) {
 class ScsForm
 {
   private static $module = false;
+
+  private function __construct()
+  {
+  }
 
   public static function init(SinClothesSizing $module)
   {
@@ -52,6 +57,8 @@ class ScsForm
       $this->submitNewModel();
     } elseif (Tools::isSubmit('update_model_submit')) {
       $this->submitUpdateModel();
+    } elseif (Tools::isSubmit('status_model') && Tools::isSubmit('id_model')) {
+      $this->submitUpdateModelStatus();
     }
   }
 
@@ -65,42 +72,55 @@ class ScsForm
         $model->$field = Tools::getValue($field);
       }
       $model->active = true;
-      $model->properties = serialize(ScsHelper::getLangProperties());
+      $model->properties = ScsHelper::getLangProperties(true);
       $this->validateAndDisplay($model, 'save');
+      Tools::redirectAdmin($this->index . '&token=' . $this->token);
     }
   }
 
   private function submitUpdateModel(): void
   {
     $model = new ScsDbModels;
-    $model = $model->getModel((int)Tools::getValue('id'));
+    $model = $model->getModel((int)Tools::getValue('id_model'), (int)self::$module->contextLanguageID);
     $model->name = Tools::getValue('name');
-    $model->active = Tools::getValue('active');
-    $model->properties = serialize(ScsHelper::getLangProperties());
+    $model->active = (bool)Tools::getValue('active');
+    $model->properties = ScsHelper::getLangProperties(true);
     $this->validateAndDisplay($model, 'update');
   }
 
-  private function validateAndDisplay(ScsDbModels $model, string $text): void
+  private function submitUpdateModelStatus(): void
   {
-    if ($this->isUnique($model, $text)) {
+    $model = new ScsDbModels;
+    $model = $model->getModel((int)Tools::getValue('id_model'));
+    $model->active = ((bool)$model->active) ? false : true;
+    $this->validateAndDisplay($model, 'update');
+    Tools::redirectAdmin($this->index . '&token=' . $this->token);
+  }
+
+  private function validateAndDisplay(ScsDbModels $model, string $command): void
+  {
+    if ($this->isUnique($model, $command)) {
       if ($model->validateFields()) {
-        $model->$text();
-        $this->display = self::$module->displayConfirmation(self::$module->l(ucfirst($text) . ' success', 'ScsForm'));
+        if ($command == 'update') {
+          $model->id = $model->id_model;
+        }
+        $model->$command();
+        $this->display = self::$module->displayConfirmation(self::$module->l(ucfirst($command) . ' success', 'ScsForm'));
       } else {
-        $this->display = self::$module->displayError(self::$module->l(ucfirst($text) . ' failure', 'ScsForm'));
+        $this->display = self::$module->displayError(self::$module->l(ucfirst($command) . ' failure', 'ScsForm'));
       }
     } else {
       $this->display = self::$module->displayError(self::$module->l('This model already exists', 'ScsForm'));
     }
   }
 
-  private function isUnique($model, $text): bool
+  private function isUnique($model, $command): bool
   {
-    if ($text == 'save') {
+    if ($command == 'save') {
       $models =  new ScsDbModels;
-      $models = array_filter($models->getModels(), function ($m) use ($model) {
-        unset($model->id);
-        unset($m->id);
+      $models = array_filter($models->getModels(self::$module->contextLanguageID), function ($m) use ($model) {
+        unset($model->id_model);
+        unset($m->id_model);
         return ($model == $m);
       });
       if (!empty($models)) return false;
@@ -126,14 +146,14 @@ class ScsForm
 
   private function getModelsList(): string
   {
-    $models = $this->prepareModels();
+    $models = $this->prepareModelsList();
     $helper = new HelperList();
     $helper->title = self::$module->l('Model list', 'ScsForm');
     $helper->table = '_model';
     $helper->no_link = true;
     $helper->simple_header = false;
     $helper->shopLinkType = '';
-    $helper->identifier = 'id';
+    $helper->identifier = 'id_model';
     $helper->actions = array('edit');
     $helper->listTotal = count($models);
     $helper->tpl_vars = array('show_filters' => false);
@@ -141,8 +161,6 @@ class ScsForm
     $helper->currentIndex = $this->index;
     return $helper->generateList($models, $this->getListColumns());
   }
-
-
 
   ### Add model process ###
 
@@ -348,6 +366,7 @@ class ScsForm
       'show_cancel_button' => true,
       'back_url' => $this->index . '&token=' . Tools::getAdminTokenLite('AdminModules'),
     ];
+
     return $helper->generateForm($form['fields']);
   }
 
@@ -356,17 +375,22 @@ class ScsForm
     $form = [];
     $form['values'] = $this->getUpdateFormValues();
     $form['fields'][0] = $this->updateModelFields($form['values']);
+
     return $form;
   }
 
   private function getUpdateFormValues(): array
   {
-    $id = Tools::getValue('id');
-    $model = ScsDbModels::getModel($id);
-    $properties = unserialize($model->properties);
+    $id_model = Tools::getValue('id_model');
+    $model = ScsDbModels::getModel($id_model);
+
+    foreach ($model->properties as $k => $p) {
+      $properties[$k] = unserialize($p);
+    }
+
     $noProperties = count($properties);
     $values = [
-      'id' => $model->id,
+      'id_model' => $model->id_model,
       'attr_group_id' => $model->attr_group_id,
       'dim_start' => $model->dim_start,
       'dim_end' => $model->dim_end,
@@ -376,8 +400,11 @@ class ScsForm
       'active' => $model->active,
       'group_name' => $this->attributesGroups[$model->attr_group_id]['name'],
     ];
-    foreach ($properties as $propID => $property) {
-      $values['property_' . $propID] = $property;
+
+    foreach ($properties as $id_lang => $property) {
+      foreach ($property as $id_prop => $val) {
+        $values['property_' . $id_prop][$id_lang] = $val;
+      }
     }
     return $values;
   }
@@ -443,7 +470,7 @@ class ScsForm
       ],
       [
         'type'  => 'html',
-        'html_content' => '<input type="hidden" id="id" value="' . $values['id'] . '"  name="id">'
+        'html_content' => '<input type="hidden" id="id_model" value="' . $values['id_model'] . '"  name="id_model">'
       ],
     ];
     $form['form']['input'] = array_merge($form['form']['input'], $this->getTextFields($values['no_properties']), $hidden);
@@ -453,24 +480,33 @@ class ScsForm
 
   ### model list ###
 
-  private function prepareModels(): array
+  private function prepareModelsList(): array
   {
     return array_map(function ($item) {
       return [
-        'id' => $item->id,
+        'id_model' => $item->id_model,
         'name' => $item->name,
         'attribute' => $this->attributesGroups[$item->attr_group_id]['name'],
+        'active' => (bool)$item->active,
         'used_in' => 0 . ' ' . self::$module->l('products', 'ScsForm'),
       ];
-    }, ScsDbModels::getModels());
+    }, ScsDbModels::getModels(self::$module->contextLanguageID));
   }
 
   private function getListColumns(): array
   {
+
     return [
-      'name' => ['title' => self::$module->l('Name', 'ScsForm'), 'type' => 'text', 'orderby' => false],
-      'attribute' => ['title' => self::$module->l('Attributes group', 'ScsForm'), 'type' => 'text', 'orderby' => false],
-      'used_in' => ['title' => self::$module->l('Used in', 'ScsForm'), 'type' => 'text', 'orderby' => false],
+      'name' => ['title' => self::$module->l('Name', 'ScsForm'), 'orderby' => false,],
+      'attribute' => ['title' => self::$module->l('Attributes group', 'ScsForm'),  'orderby' => false],
+      'active' => [
+        'title' => self::$module->l('Active', 'ScsForm'), 'type' => 'bool', 'active' => 'status',
+        'icon' => [
+          0 => 'disabled.gif',
+          1 => 'enabled.gif',
+        ], 'orderby' => false,
+      ],
+      'used_in' => ['title' => self::$module->l('Used in', 'ScsForm'), 'orderby' => false],
     ];
   }
 }
