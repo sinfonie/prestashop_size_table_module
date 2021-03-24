@@ -14,13 +14,13 @@ class ScsDbProducts extends ObjectModel
   public $id;
   public $id_product;
   public $id_model;
-  public $dimensions;
+  public $id_property;
+  public $dim_start;
+  public $dim_end;
   public $status;
 
-  const SCS_TABLE_NAME = 'scs_products';
-
   public static $definition = array(
-    'table' => self::SCS_TABLE_NAME,
+    'table' => 'scs_products',
     'primary' => 'id',
     'fields' => array(
       'id_product' => array(
@@ -33,12 +33,22 @@ class ScsDbProducts extends ObjectModel
         'validate' => 'isUnsignedInt',
         'required' => true,
       ),
-      'dimensions' => array(
-        'type' => self::TYPE_STRING,
-        'validate' => 'isString',
+      'id_property' => array(
+        'type' => self::TYPE_INT,
+        'validate' => 'isUnsignedInt',
         'required' => true,
       ),
-      'status' => array(
+      'dim_start' => array(
+        'type' => self::TYPE_INT,
+        'validate' => 'isUnsignedInt',
+        'required' => true,
+      ),
+      'dim_end' => array(
+        'type' => self::TYPE_INT,
+        'validate' => 'isUnsignedInt',
+        'required' => true,
+      ),
+      'active' => array(
         'type' => self::TYPE_BOOL,
         'validate' => 'isBool',
         'required' => true,
@@ -46,15 +56,19 @@ class ScsDbProducts extends ObjectModel
     ),
   );
 
-  public static function getProductDimensions(int $id)
+  public static function getProductModelsDimensions(int $id_product, int $id_model = null, bool $active = null)
   {
-    $dbName = '`' . _DB_PREFIX_ . self::SCS_TABLE_NAME . '`';
-    $sql = "SELECT `id`, `id_product`, `id_model`, `dimensions` FROM $dbName WHERE `id` = " . pSQL($id);
-    $result = self::dbRequest($sql);
-    if ($result && is_array($result)) {
-      return $result[0];
+    $query = new DbQuery();
+    $query->select('`id`, `id_product`, `id_model`, `dim_start`, `dim_end`, `active`');
+    $query->from('scs_products');
+    $query->where('id_product = ' . pSQL($id_product));
+    if (!is_null($id_model)) {
+      $query->where('id_model = ' . pSQL($id_model));
     }
-    return $result;
+    if (!is_null($active)) {
+      $query->where('active = ' . pSQL($active));
+    }
+    return self::dbRequest($query);
   }
 
   private static function dbRequest($sql)
@@ -69,7 +83,10 @@ class ScsDbProducts extends ObjectModel
         $object->id = $v['id'];
         $object->id_product = $v['id_product'];
         $object->id_model = $v['id_model'];
-        $object->dimensions = $v['dimensions'];
+        $object->id_property = $v['id_property'];
+        $object->dim_start = $v['dim_start'];
+        $object->dim_end = $v['dim_end'];
+        $object->active = $v['active'];
         $array[] = $object;
       }
       return $array;

@@ -105,12 +105,12 @@ class ScsForm
           $model->id = $model->id_model;
         }
         $model->$command();
-        $this->display = self::$module->displayConfirmation(self::$module->l(ucfirst($command) . ' success', 'ScsForm'));
+        $this->display = self::$module->displayConfirmation(self::$module->l(ucfirst($command) . ' success', 'sinclothessizing'));
       } else {
-        $this->display = self::$module->displayError(self::$module->l(ucfirst($command) . ' failure', 'ScsForm'));
+        $this->display = self::$module->displayError(self::$module->l(ucfirst($command) . ' failure', 'sinclothessizing'));
       }
     } else {
-      $this->display = self::$module->displayError(self::$module->l('This model already exists', 'ScsForm'));
+      $this->display = self::$module->displayError(self::$module->l('This model already exists', 'sinclothessizing'));
     }
   }
 
@@ -148,7 +148,7 @@ class ScsForm
   {
     $models = $this->prepareModelsList();
     $helper = new HelperList();
-    $helper->title = self::$module->l('Model list', 'ScsForm');
+    $helper->title = self::$module->l('Model list', 'sinclothessizing');
     $helper->table = '_model';
     $helper->no_link = true;
     $helper->simple_header = false;
@@ -187,13 +187,13 @@ class ScsForm
   {
     $form['form'] = [
       'legend' => [
-        'title' => self::$module->l('Select attribute groups for size table use', 'ScsForm'),
+        'title' => self::$module->l('Select attribute groups for size table use', 'sinclothessizing'),
         'icon' => 'icon-cogs'
       ],
       'input' => [
         [
           'type' => 'select',
-          'label' => self::$module->l('Select and add new model', 'ScsForm'),
+          'label' => self::$module->l('Select and add new model', 'sinclothessizing'),
           'name' => 'attr_group_id',
           'options' => [
             'query' => $this->groupSelect(),
@@ -203,13 +203,13 @@ class ScsForm
         ],
         [
           'type'  => 'html',
-          'label' => self::$module->l('Set number of properties', 'ScsForm'),
-          'html_content' => '<input type="number" min="1" value="1" id="no_properties" name="no_properties">'
+          'label' => self::$module->l('Set number of properties', 'sinclothessizing'),
+          'html_content' => '<input class="form-control fixed-width-xl" type="number" min="1" value="1" id="no_properties" name="no_properties">'
         ],
         [
           'type'  => 'html',
           'html_content' => '<button type="submit" value="1" id="submit-add-model" class="btn btn-primary">
-							' . self::$module->l('Add new model', 'ScsForm') . '
+							' . self::$module->l('Add new model', 'sinclothessizing') . '
 						</button>'
         ],
       ],
@@ -262,13 +262,13 @@ class ScsForm
     $sliced = $this->getSlicedAtrributesArray($formSettings['attr_group_id']);
     $form['form'] = [
       'legend' => [
-        'title' => self::$module->l('Add new dimension model for: ', 'ScsForm') . $formSettings['group_name'],
+        'title' => self::$module->l('Add new dimension model for: ', 'sinclothessizing') . $formSettings['group_name'],
         'icon' => 'icon-cogs'
       ],
       'input' => [
         [
           'type' => 'select',
-          'label' => self::$module->l('Start dimension', 'ScsForm'),
+          'label' => self::$module->l('Start dimension', 'sinclothessizing'),
           'name' => 'dim_start',
           'required' => true,
           'options' => [
@@ -279,7 +279,7 @@ class ScsForm
         ],
         [
           'type' => 'select',
-          'label' => self::$module->l('End dimension', 'ScsForm'),
+          'label' => self::$module->l('End dimension', 'sinclothessizing'),
           'name' => 'dim_end',
           'required' => true,
           'options' => [
@@ -290,7 +290,7 @@ class ScsForm
         ],
         [
           'type' => 'text',
-          'label' => self::$module->l('Model name', 'ScsForm'),
+          'label' => self::$module->l('Model name', 'sinclothessizing'),
           'name' => 'name',
           'required' => true,
           'size' => 64,
@@ -311,7 +311,7 @@ class ScsForm
         'type'  => 'html',
         'html_content' => '
         <button type="submit" value="save" id="submit-create-model" class="btn btn-primary">
-      ' . self::$module->l('Save new model', 'ScsForm') . '</button>',
+      ' . self::$module->l('Save new model', 'sinclothessizing') . '</button>',
       ]
     ];
     $form['form']['input'] = array_merge($form['form']['input'], $this->getTextFields($formSettings['no_properties']), $submit);
@@ -345,7 +345,7 @@ class ScsForm
     for ($i = 1; $i <= $noTextInputs; $i++) {
       $output[] = [
         'type'  => 'text',
-        'label' => self::$module->l('Name of property: ', 'ScsForm') . $i,
+        'label' => self::$module->l('Name of property: ', 'sinclothessizing') . $i,
         'name'  => 'property_' . $i,
         'lang'  => true,
       ];
@@ -413,29 +413,29 @@ class ScsForm
   {
     $form['form'] = [
       'legend' => [
-        'title' => self::$module->l('Update model for: ', 'ScsForm') . $values['group_name'],
+        'title' => self::$module->l('Update model for: ', 'sinclothessizing') . $values['group_name'],
         'icon' => 'icon-cogs'
       ],
       'input' => [
         [
-          'label' => self::$module->l('Start dimension', 'ScsForm'),
+          'label' => self::$module->l('Start dimension', 'sinclothessizing'),
           'type'  => 'html',
           'html_content' => '<div class="scs__row">' . $values['dim_start'] . '</div>',
         ],
         [
-          'label' => self::$module->l('End dimension', 'ScsForm'),
+          'label' => self::$module->l('End dimension', 'sinclothessizing'),
           'type'  => 'html',
           'html_content' => '<div class="scs__row">' . $values['dim_end'] . '</div>',
         ],
         [
           'type' => 'text',
-          'label' => self::$module->l('Model name', 'ScsForm'),
+          'label' => self::$module->l('Model name', 'sinclothessizing'),
           'name' => 'name',
           'size' => 64,
         ],
         [
           'type' => 'switch',
-          'label' => self::$module->l('Active', 'ScsForm'),
+          'label' => self::$module->l('Active', 'sinclothessizing'),
           'name' => 'active',
           'values' => [
             [
@@ -488,7 +488,7 @@ class ScsForm
         'name' => $item->name,
         'attribute' => $this->attributesGroups[$item->attr_group_id]['name'],
         'active' => (bool)$item->active,
-        'used_in' => 0 . ' ' . self::$module->l('products', 'ScsForm'),
+        'used_in' => 0 . ' ' . self::$module->l('products', 'sinclothessizing'),
       ];
     }, ScsDbModels::getModels(self::$module->contextLanguageID));
   }
@@ -497,16 +497,16 @@ class ScsForm
   {
 
     return [
-      'name' => ['title' => self::$module->l('Name', 'ScsForm'), 'orderby' => false,],
-      'attribute' => ['title' => self::$module->l('Attributes group', 'ScsForm'),  'orderby' => false],
+      'name' => ['title' => self::$module->l('Name', 'sinclothessizing'), 'orderby' => false,],
+      'attribute' => ['title' => self::$module->l('Attributes group', 'sinclothessizing'),  'orderby' => false],
       'active' => [
-        'title' => self::$module->l('Active', 'ScsForm'), 'type' => 'bool', 'active' => 'status',
+        'title' => self::$module->l('Active', 'sinclothessizing'), 'type' => 'bool', 'active' => 'status',
         'icon' => [
           0 => 'disabled.gif',
           1 => 'enabled.gif',
         ], 'orderby' => false,
       ],
-      'used_in' => ['title' => self::$module->l('Used in', 'ScsForm'), 'orderby' => false],
+      'used_in' => ['title' => self::$module->l('Used in', 'sinclothessizing'), 'orderby' => false],
     ];
   }
 }
