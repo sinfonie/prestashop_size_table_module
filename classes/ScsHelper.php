@@ -21,7 +21,7 @@ class ScsHelper
   {
     $attributes = AttributeGroup::getAttributes($lang, $id_group);
     if ($attributes && !empty($attributes)) return array_column($attributes, 'name', 'id_attribute');
-    return array();
+    return [];
   }
 
   /**

@@ -7,6 +7,7 @@ require_once(dirname(__FILE__) . '/classes/ScsHelper.php');
 require_once(dirname(__FILE__) . '/classes/ScsForm.php');
 require_once(dirname(__FILE__) . '/classes/ScsDbModels.php');
 require_once(dirname(__FILE__) . '/classes/ScsDbProducts.php');
+require_once(dirname(__FILE__) . '/classes/ScsDbProductsDimensions.php');
 
 class SinClothesSizing extends Module
 {
@@ -32,8 +33,6 @@ class SinClothesSizing extends Module
         $this->baseSizesNames = array('bust_s', 'bust_xl', 'waist_s', 'waist_xl', 'hips_s', 'hips_xl', 'length_s', 'length_xl');
         $this->dimentionsNames = array('bust', 'waist', 'hips', 'length');
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall?', 'sinclothessizing');
-        //$this->realSizes = $this->realSizes();
-        //  $this->getSizes = $this->getSizes();
 
         require_once dirname(__FILE__) . '/classes/SizeObject.php';
     }
@@ -74,41 +73,29 @@ class SinClothesSizing extends Module
         return '<div class="col-lg-7">' . $forms->getHTML() . '</div>';
     }
 
-    private function getDimensionsForm()
+    private function setAdminJS(array $data = [])
     {
-        $models = ScsDbModels::getModels($this->context->language->id);
-        if (!empty($models)) {
-            $model_data = [];
-            foreach ($models as $model) {
-                $atts = ScsHelper::getAttributes($model->attr_group_id, $this->context->language->id);
-                $dim = [
-                    $model->dim_start => $atts[$model->dim_start],
-                    $model->dim_end => $atts[$model->dim_end],
-                ];
-                $model_data[$model->id_model] = [
-                    'id_attribute_group' => $model->attr_group_id,
-                    'dim' => $dim,
-                    'name' => $model->name,
-                    'properties' => unserialize($model->properties[$this->context->language->id]),
-                ];
-            }
-            $this->context->smarty->assign(array(
-                'lang' => $this->context->language->id,
-                'model_data' => $model_data,
-            ));
-        }
+       // Media::addJsDef(array('qwe' => 'qw'));
+        $this->context->controller->addJS(($this->_path) . 'js/scs_admin.js');
     }
 
     public function hookDisplayAdminProductsExtra($params)
     {
         if (!in_array(Tools::getValue('id_product'), array(false, 0, '0'), true)) {
-
-
-            // $dimensions = ScsDbProducts::getProductModelsDimensions($params['id_product']);
-
-
-            $this->getDimensionsForm();
-            return $this->display(__FILE__, 'product_tab.tpl');
+            $model_data = $this->prepareModelData();
+            if (!is_null($model_data)) {
+                $this->context->smarty->assign(array(
+                    'lang' => $this->context->language->id,
+                    'model_data' => $model_data,
+                ));
+                $this->setAdminJS();
+                return $this->display(__FILE__, 'product_tab.tpl');
+            } else {
+                $this->context->controller->warnings[] = $this->l(
+                    'Models not set',
+                    'sinclothessizing'
+                );
+            }
         } else {
             $this->context->controller->warnings[] = $this->l(
                 'You must save this product before configuring sizes.',
@@ -117,76 +104,16 @@ class SinClothesSizing extends Module
         }
     }
 
-
-
-
     public function hookActionProductUpdate($params)
     {
-
-
-        //echo '<pre>';
         $models = ScsDbModels::getModels($this->context->language->id);
         foreach ($models as $model) {
             foreach ($model->properties as $property) {
-                foreach (array_keys(unserialize($property)) as $propID) {
-                    $dim_start = 'scs_' . $model->id_model . '_' . $model->dim_start . '_' . $propID;
-                    $dim_end = 'scs_' . $model->id_model . '_' . $model->dim_end . '_' . $propID;
-                    if (!empty(Tools::getValue($dim_start)) || !empty(Tools::getValue($dim_end))) {
-                        $scsDbProductsObj = new ScsDbProducts;
-                        $scsDbProductsObj->id_product = $params['id_product'];
-                        $scsDbProductsObj->id_model = $model->id_model;
-                        $scsDbProductsObj->id_property = $propID;
-                        $scsDbProductsObj->dim_start = Tools::getValue($dim_start);
-                        $scsDbProductsObj->dim_end = Tools::getValue($dim_end);
-                        $scsDbProductsObj->active = true;
-                        $scsDbProductsObj->save();
-                    }
+                foreach (array_keys(unserialize($property)) as $id_property) {
+                    $this->saveOrUpdateDimensions($model, $params['id_product'], $id_property);
                 }
             }
         }
-
-
-
-
-        //var_dump($models);
-
-        //echo '</pre>';
-
-
-
-        //var_dump($_POST);
-        /*         $objects = SizeObject::getSizeObjects($this->id_product);
-        if (!$objects) {
-            foreach ($this->countSize() as $value) {
-                if ($value != null) {
-                    $result = true;
-                    break;
-                } else {
-                    $result = false;
-                }
-            }
-            if ($result) {
-                $objects = $this->createSizeObjects();
-                foreach ($objects as $object) {
-                    $object->save();
-                }
-            } else {
-                return false;
-            }
-        } else {
-            foreach ($objects as $object) {
-                $arraySizes = array_flip($this->arraySizes);
-                foreach ($this->dimentionsNames as $name) {
-                    if (($this->countSize()[$name . '_' . $arraySizes[$object->id_size]]) == null) {
-                        $object->$name = $object->$name;
-                    } else {
-                        $object->$name = $this->countSize()[$name . '_' . $arraySizes[$object->id_size]];
-                    }
-                }
-                $object->active = $this->extremeSizes($object->id_size);
-                $object->save();
-            }
-        } */
     }
 
     public function hookActionObjectProductDeleteAfter($params)
@@ -210,9 +137,90 @@ class SinClothesSizing extends Module
         return $this->display(__FILE__, 'sinclothessizing.tpl'); */
     }
 
+    ## hookDisplayAdminProductsExtra methods ##
 
+    private function prepareModelData(): ?array
+    {
+        $models = ScsDbModels::getModels($this->context->language->id);
+        $id_product = (int)Tools::getValue('id_product');
+        if (!empty($models)) {
+            foreach ($models as $model) {
+                $product_model = ScsDbProducts::getProducts($id_product, $model->id_model);
+                $attributes = ScsHelper::getAttributes($model->attr_group_id, $this->context->language->id);
+                $properties = unserialize($model->properties[$this->context->language->id]);
+                $dimensions = $this->getDimensionValue($product_model, $model, $properties);
+                $model_data[$model->id_model] = [
+                    'id_attribute_group' => $model->attr_group_id,
+                    'name' => $model->name,
+                    'dimensions' => $dimensions,
+                    'attributes' => $attributes,
+                    'properties' => $properties,
+                    'active' => $model->active,
+                ];
+            }
+            return $model_data;
+        }
+        return null;
+    }
 
+    private function getDimensionValue($product_model, $model, $properties): array
+    {
+        $id_product_model = (int)$product_model[0]->id_product_model;
+        $pds = ScsDbProductsDimensions::getProductsDimensions($id_product_model);
+        $values = [];
+        if ($pds) {
+            foreach ($pds as $pd) {
+                $values[$pd->id_property] = [
+                    'dim_start' => $pd->dim_start,
+                    'dim_end' =>  $pd->dim_end,
+                ];
+            }
+        }
+        foreach (array_keys($properties) as $id_property) {
+            $arr[$model->dim_start][$id_property] = (isset($values[$id_property]['dim_start'])) ? $values[$id_property]['dim_start'] : 0;
+            $arr[$model->dim_end][$id_property] = (isset($values[$id_property]['dim_end'])) ? $values[$id_property]['dim_end'] : 0;
+        }
+        return $arr;
+    }
 
+    ## end ##
+
+    ## hookActionProductUpdate methods ##
+
+    private function saveOrUpdateDimensions($model, $id_product, $id_property): void
+    {
+        $fail_text = $this->l('Entry failed to update. There are more than one such entry.', 'sinclothessizing');
+        $dim_start = 'scs_' . $model->id_model . '_' . $model->dim_start . '_' . $id_property;
+        $dim_end = 'scs_' . $model->id_model . '_' . $model->dim_end . '_' . $id_property;
+        if (!empty(Tools::getValue($dim_start)) || !empty(Tools::getValue($dim_end))) {
+            $dim_start_value = (int)Tools::getValue($dim_start);
+            $dim_end_value = (int)Tools::getValue($dim_end);
+            $p = ScsDbProducts::getProducts($id_product, $model->id_model);
+            if ($p) {
+                if (count($p) === 1) {
+                    $p = $p[0];
+                    $pd = ScsDbProductsDimensions::getProductsDimensions($p->id_product_model, $id_property);
+                    if ($pd) {
+                        if (count($pd) === 1) {
+                            $pd = $pd[0];
+                            ScsDbProductsDimensions::updateDimension($pd, $dim_start_value, $dim_end_value);
+                        } else {
+                            $this->context->controller->errors[] = $fail_text;
+                        }
+                    } else {
+                        ScsDbProductsDimensions::saveProductDimensions($p->id_product_model, $id_property, $dim_start, $dim_end);
+                    }
+                } else {
+                    $this->context->controller->errors[] = $fail_text;
+                }
+            } else {
+                $id_product_model = ScsDbProducts::saveProduct($id_product, $model->id_model);
+                ScsDbProductsDimensions::saveProductDimensions($id_product_model, $id_property, $dim_start_value, $dim_end_value);
+            }
+        }
+    }
+
+    ## end ##
 
     /*    private function realSizes()
     {

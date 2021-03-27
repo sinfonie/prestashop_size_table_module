@@ -11,17 +11,14 @@ if (!defined('_PS_VERSION_')) {
 
 class ScsDbProducts extends ObjectModel
 {
-  public $id;
+  public $id_product_model;
   public $id_product;
   public $id_model;
-  public $id_property;
-  public $dim_start;
-  public $dim_end;
-  public $status;
+  public $active;
 
   public static $definition = array(
     'table' => 'scs_products',
-    'primary' => 'id',
+    'primary' => 'id_product_model',
     'fields' => array(
       'id_product' => array(
         'type' => self::TYPE_INT,
@@ -29,21 +26,6 @@ class ScsDbProducts extends ObjectModel
         'required' => true,
       ),
       'id_model' => array(
-        'type' => self::TYPE_INT,
-        'validate' => 'isUnsignedInt',
-        'required' => true,
-      ),
-      'id_property' => array(
-        'type' => self::TYPE_INT,
-        'validate' => 'isUnsignedInt',
-        'required' => true,
-      ),
-      'dim_start' => array(
-        'type' => self::TYPE_INT,
-        'validate' => 'isUnsignedInt',
-        'required' => true,
-      ),
-      'dim_end' => array(
         'type' => self::TYPE_INT,
         'validate' => 'isUnsignedInt',
         'required' => true,
@@ -56,12 +38,14 @@ class ScsDbProducts extends ObjectModel
     ),
   );
 
-  public static function getProductModelsDimensions(int $id_product, int $id_model = null, bool $active = null)
+  public static function getProducts(int $id_product = null, int $id_model = null, bool $active = null)
   {
     $query = new DbQuery();
-    $query->select('`id`, `id_product`, `id_model`, `dim_start`, `dim_end`, `active`');
+    $query->select('`id_product_model`, `id_product`, `id_model`, `active`');
     $query->from('scs_products');
-    $query->where('id_product = ' . pSQL($id_product));
+    if (!is_null($id_product)) {
+      $query->where('id_product = ' . pSQL($id_product));
+    }
     if (!is_null($id_model)) {
       $query->where('id_model = ' . pSQL($id_model));
     }
@@ -79,17 +63,24 @@ class ScsDbProducts extends ObjectModel
       return false;
     } else {
       foreach ($request as $v) {
-        $object = new self();
-        $object->id = $v['id'];
-        $object->id_product = $v['id_product'];
-        $object->id_model = $v['id_model'];
-        $object->id_property = $v['id_property'];
-        $object->dim_start = $v['dim_start'];
-        $object->dim_end = $v['dim_end'];
-        $object->active = $v['active'];
-        $array[] = $object;
+        $o = new self();
+        $o->id_product_model = $v['id_product_model'];
+        $o->id_product = $v['id_product'];
+        $o->id_model = $v['id_model'];
+        $o->active = $v['active'];
+        $array[] = $o;
       }
       return $array;
     }
+  }
+
+  public static function saveProduct(int $id_product, int $id_model): int
+  {
+    $p = new ScsDbProducts;
+    $p->id_product = $id_product;
+    $p->id_model = $id_model;
+    $p->active = true;
+    $p->save();
+    return $p->id;
   }
 }

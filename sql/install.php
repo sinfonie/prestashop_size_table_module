@@ -24,16 +24,25 @@ $sql[] = 'CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . 'scs_models_lang`(
 	) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8';
 
 $sql[] = 'CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . 'scs_products`(
-	`id`  int(10) unsigned NOT NULL auto_increment,
+	`id_product_model` int(10) unsigned NOT NULL auto_increment,
 	`id_product` int(10) unsigned NOT NULL,
 	`id_model` int(10) unsigned NOT NULL,
+	`active` boolean NOT NULL,
+	`date_add` datetime DEFAULT CURRENT_TIMESTAMP,
+	`date_upd` datetime NULL ON UPDATE CURRENT_TIMESTAMP,
+	PRIMARY KEY (`id_product_model`)
+	) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8';
+
+$sql[] = 'CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . 'scs_products_dimensions`(
+	`id_dimension` int(10) unsigned NOT NULL auto_increment,
+	`id_product_model` int(10) unsigned NOT NULL,
 	`id_property` int(10) unsigned NOT NULL,
 	`dim_start` int(11),
 	`dim_end` int(11),
 	`active` boolean NOT NULL,
 	`date_add` datetime DEFAULT CURRENT_TIMESTAMP,
 	`date_upd` datetime NULL ON UPDATE CURRENT_TIMESTAMP,
-	PRIMARY KEY (`id`)
+	PRIMARY KEY (`id_dimension`)
 	) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8';
 
 
